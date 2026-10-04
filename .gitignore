@@ -31,6 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.expo-home/
 .env*.local
 
 # typescript
