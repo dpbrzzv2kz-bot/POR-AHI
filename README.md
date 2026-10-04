@@ -4,7 +4,17 @@ Nombre provisional de interfaz: «por ahí». Proyecto independiente de MUSA.
 
 Expo + React Native + TypeScript. Feed visual de fotos y videos con tres categorías. La información de la reseña se abre en un panel separado desde «Ver detalles» o deslizando hacia arriba sobre ese control. Al acabar un video aparece una invitación a ver detalles, sin abrir el panel automáticamente. Guardar y quitar pendientes y perfil con contadores.
 
-Publicación local mediante expo-image-picker y reproducción mediante expo-video. Se exige foto o video y nombre de lugar; la descripción es opcional. Límites preliminares de 100 MB y 60 segundos cuando el selector facilita metadatos. Antes de producción se necesitan validaciones de archivos en servidor, conversión y almacenamiento real. No se sube ningún archivo a internet. Los ejemplos iniciales son maquetas con personas y lugares ficticios. El estado vive en memoria y se pierde al reiniciar. No hay cuentas reales, stories de 24 h, seguidores ni buscador conectados.
+Publicación local mediante expo-image-picker y reproducción mediante expo-video. Se exige foto o video y nombre de lugar; la descripción es opcional. Límites preliminares de 100 MB y 60 segundos cuando el selector facilita metadatos. Antes de producción se necesitan validaciones de archivos en servidor, conversión y almacenamiento real. No se sube ningún archivo a internet. Los ejemplos iniciales son maquetas con personas y lugares ficticios. El estado vive en memoria y se pierde al reiniciar. No hay cuentas ni servicios sociales reales conectados.
+
+## Primer enfoque social
+
+Cinco pestañas: Fotos, Videos, Mensajes, Buscar y Perfil. Fotos y videos se separan por tipo de archivo. Para ti muestra ejemplos; Siguiendo filtra según los perfiles seguidos localmente; Cerca de ti usa etiquetas estáticas de demostración, sin GPS ni recomendador real.
+
+Stories separadas en la cabecera de Fotos. El botón Tu story abre un selector de foto/video; se asigna caducidad de 24 horas y la vista se actualiza cada 30 segundos. Reiniciar borra el estado, incluso stories propias. Las stories de muestra se regeneran con cada arranque; no son publicaciones reales.
+
+Búsqueda de perfiles ficticios por nombre y usuario, abrir perfiles y seguir/dejar de seguir. Mensajes locales de prueba que no se envían a nadie. Perfil con fotos/videos propios y guardados. Me gusta y guardado son controles separados. Crear reseña desde ＋.
+
+Verificados en navegador: filtros de seguimiento, separación de videos, búsqueda por @usuario, apertura de perfil, seguir, apertura de story, conversación local. TypeScript pasa. Falta prueba en iPhone y conexión de servicios reales.
 
 El cambio de feed se verificó con TypeScript y en navegador: detalles separados, guardado, rechazo de publicación sin archivo y selección/publicación de imagen de prueba. El video y gesto táctil en iPhone aún no se comprobaron en un dispositivo físico.
 
