@@ -2,7 +2,11 @@
 
 Nombre provisional de interfaz: «por ahí». Proyecto independiente de MUSA.
 
-Expo + React Native + TypeScript. Inicio con tres categorías, detalle de reseña, guardar y quitar pendientes, publicación de reseñas de comida de prueba y perfil con contadores. Personas y lugares iniciales ficticios. No hay cuentas reales, backend ni fotografías de lugares. El estado vive en memoria y se pierde al reiniciar.
+Expo + React Native + TypeScript. Feed visual de fotos y videos con tres categorías. La información de la reseña se abre en un panel separado desde «Ver detalles» o deslizando hacia arriba sobre ese control. Al acabar un video aparece una invitación a ver detalles, sin abrir el panel automáticamente. Guardar y quitar pendientes y perfil con contadores.
+
+Publicación local mediante expo-image-picker y reproducción mediante expo-video. Se exige foto o video y nombre de lugar; la descripción es opcional. Límites preliminares de 100 MB y 60 segundos cuando el selector facilita metadatos. Antes de producción se necesitan validaciones de archivos en servidor, conversión y almacenamiento real. No se sube ningún archivo a internet. Los ejemplos iniciales son maquetas con personas y lugares ficticios. El estado vive en memoria y se pierde al reiniciar. No hay cuentas reales, stories de 24 h, seguidores ni buscador conectados.
+
+El cambio de feed se verificó con TypeScript y en navegador: detalles separados, guardado, rechazo de publicación sin archivo y selección/publicación de imagen de prueba. El video y gesto táctil en iPhone aún no se comprobaron en un dispositivo físico.
 
 ## Ejecutar
 
