@@ -48,3 +48,6 @@ Proyecto Supabase independiente bxsllqteuafbusruspqd. Variables públicas en .en
 
 Corrección de Guardar perfil: normaliza @ y mayúsculas, muestra avisos junto al botón y permite reintentar la carga. Cancela consultas de perfil a los 15 segundos. TypeScript/export web pasan. Prueba SQL con rol authenticated insertó, actualizó y leyó perfil propio en una transacción revertida, sin conservar datos. Publicado y verificado bundle index-0167c9b90a8e069d992ecd71e3f7541e.js. Verificación del recorrido en iPhone pendiente.
 
+
+La cabecera del perfil usa ahora el registro cargado o guardado en Supabase (nombre, usuario y biografía); los contadores locales se marcan como demostración. Cerrar sesión limpia la identidad visible. TypeScript y export web verificados.
+

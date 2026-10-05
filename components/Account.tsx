@@ -3,7 +3,8 @@ import {View,Text,TextInput,Pressable,StyleSheet} from 'react-native';
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 
-export default function Account(){
+export type Profile={display_name:string;username:string|null;bio:string};
+export default function Account({onProfileChange}:{onProfileChange:(profile:Profile|null)=>void}){
  const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(true);
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[signup,setSignup]=useState(false);
  const [name,setName]=useState(''),[username,setUsername]=useState(''),[bio,setBio]=useState('');
@@ -18,21 +19,21 @@ export default function Account(){
  },[]);
  useEffect(()=>{
   let active=true;const controller=new AbortController();
-  setProfileReady(false);setProfileLoading(!!session);setNotice('');
+  setProfileReady(false);setProfileLoading(!!session);setNotice('');onProfileChange(null);
   if(session&&supabase){
    const timer=setTimeout(()=>controller.abort(),15000);
    (async()=>{try{
     const {data,error}=await supabase!.from('profiles').select('display_name,username,bio').eq('id',session.user.id).abortSignal(controller.signal).maybeSingle();
     if(!active)return;
     if(error)throw error;
-    setName(data?.display_name||'');setUsername(data?.username||'');setBio(data?.bio||'');setProfileReady(true);
+    setName(data?.display_name||'');setUsername(data?.username||'');setBio(data?.bio||'');setProfileReady(true);onProfileChange(data);
    }catch{if(active)setNotice('No se pudo cargar tu perfil. Pulsa Reintentar carga.');}
    finally{clearTimeout(timer);if(active)setProfileLoading(false);}})();
    return()=>{active=false;clearTimeout(timer);controller.abort();};
   }
   setName('');setUsername('');setBio('');
   return()=>{active=false;controller.abort();};
- },[session?.user.id,loadAttempt]);
+ },[session?.user.id,loadAttempt,onProfileChange]);
  const action=async()=>{
   if(!supabase)return;
   setNotice('');
@@ -54,7 +55,7 @@ export default function Account(){
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
   try{const {data,error}=await supabase.from('profiles').upsert({id:session.user.id,display_name:name.trim(),username:normalizedUsername,bio:bio.trim()},{onConflict:'id'}).select('display_name,username,bio').abortSignal(controller.signal).single();
    if(error){setNotice(error.code==='23505'?'Ese usuario ya está ocupado. Elige otro.':error.code==='42501'?'Tu sesión no tiene acceso. Cierra sesión y vuelve a entrar.':'No se pudo guardar. Reintenta; si continúa, cierra sesión y vuelve a entrar.');}
-   else if(data){setName(data.display_name);setUsername(data.username);setBio(data.bio);setNotice('Perfil guardado en tu cuenta.');}
+   else if(data){setName(data.display_name);setUsername(data.username);setBio(data.bio);onProfileChange(data);setNotice('Perfil guardado en tu cuenta.');}
   }catch{setNotice('La conexión tardó demasiado o no está disponible. Vuelve a intentar guardar.');}finally{clearTimeout(timer);setBusy(false);}
  };
  const button=(text:string,onPress:()=>void,disabled=false)=><Pressable accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={[styles.button,(disabled||busy)&&{opacity:.5}]}><Text style={styles.buttonText}>{text}</Text></Pressable>;
