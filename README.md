@@ -45,3 +45,6 @@ Próximos pasos: sesión Expo y primera prueba iPhone, persistencia de borradore
 ## Cuentas y perfiles (2026-10-05)
 Proyecto Supabase independiente bxsllqteuafbusruspqd. Variables públicas en .env.example; copiar a .env y usar solo publishable, nunca secret/service_role. Migración supabase/001_profiles.sql aplicada: RLS, lectura y escritura solo de perfil propio. Registro con confirmación de correo, inicio/cierre de sesión y edición de nombre, usuario y biografía desde Perfil. Configurar Site URL en Supabase con la URL Netlify. No se ha probado el registro con un correo humano; validar confirmación, persistencia y permisos antes de abrir al público. Perfiles aún privados; búsqueda pública pendiente. Dependencias reportan 24 hallazgos npm audit: revisión antes del lanzamiento público.
 
+
+Corrección de Guardar perfil: normaliza @ y mayúsculas, muestra avisos junto al botón y permite reintentar la carga. Cancela consultas de perfil a los 15 segundos. TypeScript/export web pasan. Prueba SQL con rol authenticated insertó, actualizó y leyó perfil propio en una transacción revertida, sin conservar datos. Publicado y verificado bundle index-0167c9b90a8e069d992ecd71e3f7541e.js. Verificación del recorrido en iPhone pendiente.
+
