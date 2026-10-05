@@ -4,7 +4,7 @@ Nombre provisional de interfaz: «por ahí». Proyecto independiente de MUSA.
 
 Expo + React Native + TypeScript. Feed visual de fotos y videos con tres categorías. La información de la reseña se abre en un panel separado desde «Ver detalles» o deslizando hacia arriba sobre ese control. Al acabar un video aparece una invitación a ver detalles, sin abrir el panel automáticamente. Guardar y quitar pendientes y perfil con contadores.
 
-Publicación local mediante expo-image-picker y reproducción mediante expo-video. Se exige foto o video y nombre de lugar; la descripción es opcional. Límites preliminares de 100 MB y 60 segundos cuando el selector facilita metadatos. Antes de producción se necesitan validaciones de archivos en servidor, conversión y almacenamiento real. No se sube ningún archivo a internet. Los ejemplos iniciales son maquetas con personas y lugares ficticios. El estado vive en memoria y se pierde al reiniciar. Las cuentas y perfiles usan Supabase; publicaciones, seguimiento y mensajes siguen siendo locales.
+Publicación local mediante expo-image-picker y reproducción mediante expo-video. Se exige foto o video y nombre de lugar; la descripción es opcional. Límites preliminares de 100 MB y 60 segundos cuando el selector facilita metadatos. Antes de producción se necesitan validaciones de archivos en servidor, conversión y almacenamiento real. Las reseñas visuales se suben a Supabase al pulsar Publicar; las stories siguen siendo locales. Los ejemplos iniciales son maquetas con personas y lugares ficticios. Solo el estado de demostración vive en memoria; las reseñas se recuperan de Supabase. Cuentas, perfiles y reseñas usan Supabase; stories, seguimiento, mensajes, likes y guardados siguen siendo locales.
 
 ## Primer enfoque social
 
@@ -50,4 +50,9 @@ Corrección de Guardar perfil: normaliza @ y mayúsculas, muestra avisos junto a
 
 
 La cabecera del perfil usa ahora el registro cargado o guardado en Supabase (nombre, usuario y biografía); los contadores locales se marcan como demostración. Cerrar sesión limpia la identidad visible. TypeScript y export web verificados.
+
+
+## Publicaciones persistentes (2026-10-05)
+Migración 002_posts.sql aplicada. Tabla posts con RLS, lectura pública e inserción propia; trigger fija autor desde perfil propio y requiere @usuario. Bucket review-media privado, máximo 6 MiB, MIME JPG/PNG/WebP/MP4/MOV. Objetos no publicados son legibles solo por su dueño; publicados permiten lectura con políticas y enlaces firmados de una hora. Actualizar publicaciones recarga últimas 60 reseñas. El perfil filtra por id real de usuario. No hay borrado/edición, paginación, transcoding, moderación o cargas reanudables todavía. Reintentos reutilizan ruta para reducir duplicados. Archivos huérfanos tras fallos requieren limpieza futura. Duración 60 s es validación cliente si hay metadatos.
+Verificación: TypeScript/export web pasan; API anónima de feed responde; check_posts_rollback.sql pasó cuatro verificaciones de privacidad de borrador, autor, lectura de post y de medio publicado, sin conservar filas. Selector de imagen, rechazo sin archivo y rechazo sin sesión comprobados en navegador. Subida completa de un archivo real con cuenta desde iPhone todavía pendiente; no se afirma que haya sido probada. Dependencias npm audit siguen con 24 hallazgos que requieren revisión antes de lanzamiento amplio.
 
