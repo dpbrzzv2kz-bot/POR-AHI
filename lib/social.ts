@@ -22,3 +22,10 @@ export async function changeFollow(userId:string,targetId:string,follow:boolean)
  const result=follow?await supabase.from('follows').upsert({follower_id:userId,followed_id:targetId},{onConflict:'follower_id,followed_id',ignoreDuplicates:true}):await supabase.from('follows').delete().eq('follower_id',userId).eq('followed_id',targetId);
  if(result.error)throw new Error('No se pudo cambiar el seguimiento. Comprueba tu sesión y que hayas guardado tu perfil.');
 }
+
+export async function getPublicProfile(id:string):Promise<PublicProfile|null>{
+ if(!supabase)throw new Error('La conexión todavía no está configurada.');
+ const {data,error}=await supabase.from('public_profiles').select('id,display_name,username,bio').eq('id',id).maybeSingle();
+ if(error)throw new Error('No se pudo abrir el perfil. Vuelve a intentar.');
+ return data?{id:data.id,name:data.display_name,handle:data.username,bio:data.bio,symbol:data.display_name[0]?.toUpperCase()||'?'}:null;
+}
