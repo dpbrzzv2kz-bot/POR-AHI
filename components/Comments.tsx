@@ -1,7 +1,8 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {View,Text,TextInput,Pressable,StyleSheet} from 'react-native';
+import type {ReportTarget} from '../lib/safety';
 import {loadComments,addComment,removeComment,commentId,type Comment} from '../lib/interactions';
-export default function Comments({postId,userId,onChange}:{postId:string;userId:string|null;onChange:()=>void}){
+export default function Comments({postId,userId,onChange,report}:{postId:string;userId:string|null;onChange:()=>void;report:(target:ReportTarget)=>void}){
  const [rows,setRows]=useState<Comment[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[draft,setDraft]=useState(''),[removed,setRemoved]=useState<string|null>(null);
  const draftId=useRef(''),mounted=useRef(true),lock=useRef(false);
  const reload=useCallback(async(signal?:AbortSignal)=>{setLoading(true);try{const data=await loadComments(postId,signal);if(mounted.current)setRows(data);}finally{if(mounted.current)setLoading(false);}},[postId]);
@@ -10,7 +11,7 @@ export default function Comments({postId,userId,onChange}:{postId:string;userId:
  const button=(label:string,action:()=>void)=><Pressable accessibilityRole="button" disabled={busy} onPress={action} style={[s.button,busy&&{opacity:.5}]}><Text style={s.buttonText}>{label}</Text></Pressable>;
  return <View style={s.box}><Text style={s.title}>Comentarios</Text>{loading&&<Text style={s.note}>Cargando comentarios…</Text>}{!!error&&<Text accessibilityRole="alert" style={s.note}>{error}</Text>}{button('Actualizar comentarios',()=>run(async()=>{}))}
  {!loading&&!rows.length&&!error&&<Text style={s.note}>Todavía no hay comentarios.</Text>}
- {rows.map(row=><View key={row.id} style={s.comment}><Text style={s.author}>{row.author_name}</Text><Text style={s.body}>{row.body}</Text>{row.user_id===userId&&button('Borrar mi comentario',()=>run(async()=>{await removeComment(userId,row.id);if(mounted.current)setRemoved(row.id);} ))}</View>)}
+ {rows.map(row=><View key={row.id} style={s.comment}><Text style={s.author}>{row.author_name}</Text><Text style={s.body}>{row.body}</Text>{row.user_id!==userId&&button('Reportar comentario',()=>report({kind:'comment',id:row.id,label:'Comentario de '+row.author_name}))}{row.user_id===userId&&button('Borrar mi comentario',()=>run(async()=>{await removeComment(userId,row.id);if(mounted.current)setRemoved(row.id);} ))}</View>)}
  {removed&&userId&&<View><Text style={s.note}>Comentario borrado.</Text>{button('Deshacer borrado',()=>run(async()=>{await removeComment(userId,removed,true);if(mounted.current)setRemoved(null);} ))}</View>}
  {userId?<><TextInput accessibilityLabel="Escribir comentario" value={draft} onChangeText={text=>{setDraft(text);draftId.current='';}} editable={!busy} maxLength={1000} multiline placeholder="Comparte tu opinión…" placeholderTextColor="#7a8479" style={s.input}/>{button('Publicar comentario',()=>{if(!draft.trim()){setError('Escribe un comentario antes de publicar.');return;}if(!draftId.current)draftId.current=commentId();run(async()=>{await addComment(userId,postId,draft,draftId.current);if(mounted.current){setDraft('');draftId.current='';}});})}</>:<Text style={s.note}>Inicia sesión desde Perfil para comentar.</Text>}
  {rows.length===50&&<Text style={s.note}>Mostramos los últimos 50 comentarios.</Text>}
