@@ -9,7 +9,7 @@ insert into public.profiles(id,display_name,username) values
  (current_setting('test.b')::uuid,'Prueba B','prueba_'||left(replace(current_setting('test.b'),'-',''),12));
 set local role authenticated;
 select set_config('request.jwt.claim.sub',current_setting('test.b'),true);
-insert into storage.objects(bucket_id,name,owner_id) values('review-media',auth.uid()||'/interaction-test.png',auth.uid()::text);
+insert into storage.objects(bucket_id,name,owner_id,metadata) values('review-media',auth.uid()||'/interaction-test.png',auth.uid()::text,'{"size":128,"mimetype":"image/png"}');
 insert into public.posts(id,user_id,author_name,category,place,kind,media_path) values(current_setting('test.post')::uuid,auth.uid(),'Overridden','Explorar','Temporal','image',auth.uid()||'/interaction-test.png');
 select set_config('request.jwt.claim.sub',current_setting('test.a'),true);
 insert into public.post_likes(user_id,post_id) values(auth.uid(),current_setting('test.post')::uuid);

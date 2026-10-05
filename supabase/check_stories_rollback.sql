@@ -3,7 +3,7 @@ begin;
 select set_config('test.uid',(select id::text from public.profiles where username is not null limit 1),true);
 select set_config('request.jwt.claim.sub',current_setting('test.uid'),true);
 set local role authenticated;
-insert into storage.objects(bucket_id,name,owner_id) values('review-media',current_setting('test.uid')||'/story-verification.png',current_setting('test.uid'));
+insert into storage.objects(bucket_id,name,owner_id,metadata) values('review-media',current_setting('test.uid')||'/story-verification.png',current_setting('test.uid'),'{"size":128,"mimetype":"image/png"}');
 insert into public.stories(user_id,author_name,kind,media_path,expires_at)
 values(auth.uid(),'Must be overridden','image',current_setting('test.uid')||'/story-verification.png','2099-01-01');
 select set_config('test.fixed_expiry',(select (expires_at-created_at=interval '24 hours')::text from public.stories where media_path=current_setting('test.uid')||'/story-verification.png'),true);

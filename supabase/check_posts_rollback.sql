@@ -4,7 +4,7 @@ begin;
 select set_config('test.uid',(select id::text from public.profiles where username is not null limit 1),true);
 select set_config('request.jwt.claim.sub',current_setting('test.uid'),true);
 set local role authenticated;
-insert into storage.objects(bucket_id,name,owner_id) values('review-media',current_setting('test.uid')||'/verification.png',current_setting('test.uid'));
+insert into storage.objects(bucket_id,name,owner_id,metadata) values('review-media',current_setting('test.uid')||'/verification.png',current_setting('test.uid'),'{"size":128,"mimetype":"image/png"}');
 set local role anon;
 select set_config('request.jwt.claim.sub','',true);
 select set_config('test.draft_hidden',(select (count(*)=0)::text from storage.objects where bucket_id='review-media' and name=current_setting('test.uid')||'/verification.png'),true);

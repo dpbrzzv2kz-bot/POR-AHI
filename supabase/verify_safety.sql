@@ -10,7 +10,7 @@ select set_config('test.chat',gen_random_uuid()::text,true);
 insert into auth.users(id,aud,role,email) select current_setting('test.'||x)::uuid,'authenticated','authenticated',x||'-safety@example.invalid' from unnest(array['a','b','c'])x;
 insert into public.profiles(id,display_name,username,bio) select current_setting('test.'||x)::uuid,'Prueba '||x,'safe_'||substr(replace(current_setting('test.'||x),'-',''),1,15),'Temporal' from unnest(array['a','b','c'])x;
 select set_config('request.jwt.claim.sub',current_setting('test.b'),true);
-insert into storage.objects(bucket_id,name) values('review-media',current_setting('test.b')||'/safe.jpg'),('review-media',current_setting('test.b')||'/story.jpg');
+insert into storage.objects(bucket_id,name,metadata) values('review-media',current_setting('test.b')||'/safe.jpg','{"size":128,"mimetype":"image/jpeg"}'),('review-media',current_setting('test.b')||'/story.jpg','{"size":128,"mimetype":"image/jpeg"}');
 insert into public.posts(id,user_id,author_name,category,place,kind,media_path) values(current_setting('test.post')::uuid,current_setting('test.b')::uuid,'','Comer','Prueba','image',current_setting('test.b')||'/safe.jpg');
 insert into public.stories(id,user_id,author_name,kind,media_path) values(current_setting('test.story')::uuid,current_setting('test.b')::uuid,'','image',current_setting('test.b')||'/story.jpg');
 insert into public.comments(id,user_id,post_id,author_name,body) values(current_setting('test.comment')::uuid,current_setting('test.b')::uuid,current_setting('test.post')::uuid,'','Comentario temporal');

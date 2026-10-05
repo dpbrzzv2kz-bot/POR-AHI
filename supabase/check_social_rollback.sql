@@ -9,7 +9,7 @@ insert into public.profiles(id,display_name,username,bio) values
  (current_setting('test.b')::uuid,'Prueba social B','prueba_'||left(replace(current_setting('test.b'),'-',''),12),'Temporal');
 select set_config('request.jwt.claim.sub',current_setting('test.b'),true);
 set local role authenticated;
-insert into storage.objects(bucket_id,name,owner_id) values('review-media',auth.uid()||'/social-test.png',auth.uid()::text);
+insert into storage.objects(bucket_id,name,owner_id,metadata) values('review-media',auth.uid()||'/social-test.png',auth.uid()::text,'{"size":128,"mimetype":"image/png"}');
 insert into public.posts(user_id,author_name,category,place,kind,media_path) values(auth.uid(),'Overridden','Explorar','Prueba temporal','image',auth.uid()||'/social-test.png');
 set local role anon;
 select set_config('request.jwt.claim.sub','',true);
