@@ -7,12 +7,14 @@ export type Review={id:string;category:string;place:string;text:string;author:st
 export type Story={id:string;userId:string;name:string;expires:number;media?:Media;color:string};
 const bucket='review-media';
 const formats:Record<string,string>={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','video/mp4':'mp4','video/quicktime':'mov'};
-export async function loadPosts(filter?:{userId?:string;userIds?:string[]}):Promise<Review[]>{
+export async function loadPosts(filter?:{userId?:string;userIds?:string[];postIds?:string[]}):Promise<Review[]>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  if(filter?.userIds&&!filter.userIds.length)return [];
+ if(filter?.postIds&&!filter.postIds.length)return [];
  let request=supabase.from('posts').select('id,user_id,author_name,category,place,description,kind,media_path').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(60);
  if(filter?.userId)request=request.eq('user_id',filter.userId);
  if(filter?.userIds)request=request.in('user_id',filter.userIds);
+ if(filter?.postIds)request=request.in('id',filter.postIds);
  const {data,error}=await request;
  if(error)throw new Error('No se pudieron cargar las publicaciones. Pulsa Actualizar.');
  if(!data?.length)return [];
