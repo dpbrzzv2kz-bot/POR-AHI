@@ -4,7 +4,7 @@ Nombre provisional de interfaz: «por ahí». Proyecto independiente de MUSA.
 
 Expo + React Native + TypeScript. Feed visual de fotos y videos con tres categorías. La información de la reseña se abre en un panel separado desde «Ver detalles» o deslizando hacia arriba sobre ese control. Al acabar un video aparece una invitación a ver detalles, sin abrir el panel automáticamente. Guardar y quitar pendientes y perfil con contadores.
 
-Publicación local mediante expo-image-picker y reproducción mediante expo-video. Se exige foto o video y nombre de lugar; la descripción es opcional. Límites preliminares de 100 MB y 60 segundos cuando el selector facilita metadatos. Antes de producción se necesitan validaciones de archivos en servidor, conversión y almacenamiento real. No se sube ningún archivo a internet. Los ejemplos iniciales son maquetas con personas y lugares ficticios. El estado vive en memoria y se pierde al reiniciar. No hay cuentas ni servicios sociales reales conectados.
+Publicación local mediante expo-image-picker y reproducción mediante expo-video. Se exige foto o video y nombre de lugar; la descripción es opcional. Límites preliminares de 100 MB y 60 segundos cuando el selector facilita metadatos. Antes de producción se necesitan validaciones de archivos en servidor, conversión y almacenamiento real. No se sube ningún archivo a internet. Los ejemplos iniciales son maquetas con personas y lugares ficticios. El estado vive en memoria y se pierde al reiniciar. Las cuentas y perfiles usan Supabase; publicaciones, seguimiento y mensajes siguen siendo locales.
 
 ## Primer enfoque social
 
@@ -41,3 +41,7 @@ TypeScript: `node node_modules/typescript/bin/tsc --noEmit`.
 La navegación, detalle y guardado se comprobaron en navegador. TypeScript pasó y se exportó el paquete JavaScript de iOS con `--no-bytecode` para diagnóstico. Falta comprobar el dispositivo físico. La exportación Hermes encontró un bloqueo del ejecutable en este equipo; no hay compilación nativa firmada ni envío a las tiendas. Revisar dependencias de la plantilla y runtime Node LTS antes de publicación; no ejecutar actualizaciones incompatibles automáticas.
 
 Próximos pasos: sesión Expo y primera prueba iPhone, persistencia de borradores, diseño revisado con el usuario, fotos, Supabase independiente, autenticación y permisos, moderación, pruebas con usuarios.
+
+## Cuentas y perfiles (2026-10-05)
+Proyecto Supabase independiente bxsllqteuafbusruspqd. Variables públicas en .env.example; copiar a .env y usar solo publishable, nunca secret/service_role. Migración supabase/001_profiles.sql aplicada: RLS, lectura y escritura solo de perfil propio. Registro con confirmación de correo, inicio/cierre de sesión y edición de nombre, usuario y biografía desde Perfil. Configurar Site URL en Supabase con la URL Netlify. No se ha probado el registro con un correo humano; validar confirmación, persistencia y permisos antes de abrir al público. Perfiles aún privados; búsqueda pública pendiente. Dependencias reportan 24 hallazgos npm audit: revisión antes del lanzamiento público.
+
