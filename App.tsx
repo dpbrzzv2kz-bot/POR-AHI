@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {router} from 'expo-router';
+import {router,useLocalSearchParams} from 'expo-router';
 import useModerator from './lib/useModerator';
 import {View, Text, ScrollView, Pressable, StyleSheet, Image, Modal, TextInput, Platform, PanResponder, useWindowDimensions} from 'react-native';
 import {StatusBar} from 'expo-status-bar';
@@ -47,12 +47,14 @@ function MediaCard({review,saved,toggle,open,height,liked,like,counts,busy}:{rev
 
 const initialReviews:Review[]=[...seed,...seed.map((r,i)=>({...r,id:'v'+i,kind:'video' as const,text:r.text,place:r.place+' · Video de maqueta',symbol:'▷'}))];
 export default function App(){
+ const {account}=useLocalSearchParams<{account?:string}>();
  const {height}=useWindowDimensions();
  const [ownProfile,setOwnProfile]=useState<Profile|null>(null);
  const [userId,setUserId]=useState<string|null>(null),[feedError,setFeedError]=useState(''),[feedBusy,setFeedBusy]=useState(false);
  const feedGeneration=React.useRef(0),uploadToken=React.useRef('');
  const [tab,setTab]=useState('Fotos'),[audience,setAudience]=useState('Para ti'),[reviews,setReviews]=useState(initialReviews),[detail,setDetail]=useState<Review|null>(null);
  const [following,setFollowing]=useState<string[]>([]),[person,setPerson]=useState<string|null>(null),[showSaved,setShowSaved]=useState(false);
+ React.useEffect(()=>{if(account==='1'){setTab('Perfil');setPerson(null);setShowSaved(false);}},[account]);
  const [activePerson,setActivePerson]=useState<PublicProfile|null>(null),[socialError,setSocialError]=useState(''),[followBusy,setFollowBusy]=useState(false),[socialAttempt,setSocialAttempt]=useState(0),[followingReady,setFollowingReady]=useState(false);
  const [profileReviews,setProfileReviews]=useState<Review[]>([]),[followReviews,setFollowReviews]=useState<Review[]>([]),[profileBusy,setProfileBusy]=useState(false),[followFeedBusy,setFollowFeedBusy]=useState(false),[profileError,setProfileError]=useState(''),[followFeedError,setFollowFeedError]=useState('');
  const socialGeneration=React.useRef(0);

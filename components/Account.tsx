@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {View,Text,TextInput,Pressable,StyleSheet} from 'react-native';
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
+import {router} from 'expo-router';
 
 export type Profile={display_name:string;username:string|null;bio:string};
 export default function Account({onProfileChange}:{onProfileChange:(profile:Profile|null)=>void}){
@@ -75,6 +76,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  <Text style={styles.label}>Correo</Text><TextInput accessibilityLabel="Correo de la cuenta" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" style={styles.input}/>
  <Text style={styles.label}>Contraseña</Text><TextInput accessibilityLabel="Contraseña de la cuenta" value={password} onChangeText={setPassword} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.input}/>
  {button(busy?'Conectando…':signup?'Crear cuenta':'Iniciar sesión',action)}
+ {!signup&&button('Olvidé mi contraseña',()=>{setPassword('');router.push('/forgot-password');})}
  {button(signup?'Ya tengo cuenta':'Quiero registrarme',()=>{setSignup(!signup);setNotice('');setPassword('');})}</>}
  {!session&&!!notice&&<Text accessibilityRole="alert" style={styles.note}>{notice}</Text>}
  </View>;
