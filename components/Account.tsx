@@ -62,7 +62,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  if(!supabase)return <Text style={styles.note}>La conexión de cuentas aún no está configurada.</Text>;
  if(loading)return <Text style={styles.note}>Cargando tu cuenta…</Text>;
  return <View style={styles.box}><Text style={styles.title}>{session?'Tu cuenta real':signup?'Crea tu cuenta':'Entra a tu cuenta'}</Text>
- {session?<><Text style={styles.note}>Tu perfil se guarda en la nube. Las reseñas se guardan en la nube; stories y mensajes siguen siendo pruebas locales.</Text>
+ {session?<><Text style={styles.note}>Tu perfil se guarda en la nube. Las reseñas y stories se guardan en la nube; los mensajes siguen siendo de prueba.</Text>
  <Text style={styles.label}>Nombre</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Nombre del perfil" value={name} onChangeText={setName} maxLength={80} style={styles.input}/>
  <Text style={styles.label}>@usuario</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Usuario del perfil" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={25} style={styles.input}/>
  <Text style={styles.label}>Sobre ti</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Biografía del perfil" value={bio} onChangeText={setBio} multiline maxLength={300} style={styles.input}/>
@@ -80,6 +80,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  </View>;
 }
 const styles=StyleSheet.create({feedback:{fontSize:14,lineHeight:22,color:'#243d31',fontWeight:'600',padding:12,backgroundColor:'#fff',borderRadius:10,marginTop:12},box:{padding:18,borderRadius:18,backgroundColor:'#eef1e8',marginBottom:18},title:{fontSize:23,fontWeight:'700',color:'#243d31'},note:{fontSize:13,lineHeight:21,color:'#536350',marginVertical:10},label:{fontSize:13,color:'#334b3b',marginTop:14,marginBottom:8},input:{backgroundColor:'#fff',padding:14,borderRadius:12,color:'#243d31',fontSize:15},button:{backgroundColor:'#965337',borderRadius:12,padding:15,marginTop:12,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'600'}});
+
 
 
 
