@@ -33,7 +33,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
   }
   setName('');setUsername('');setBio('');
   return()=>{active=false;controller.abort();};
- },[session?.user.id,loadAttempt,onProfileChange]);
+ },[session,loadAttempt,onProfileChange]);
  const action=async()=>{
   if(!supabase)return;
   setNotice('');
