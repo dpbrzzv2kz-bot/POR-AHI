@@ -62,7 +62,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  if(!supabase)return <Text style={styles.note}>La conexión de cuentas aún no está configurada.</Text>;
  if(loading)return <Text style={styles.note}>Cargando tu cuenta…</Text>;
  return <View style={styles.box}><Text style={styles.title}>{session?'Tu cuenta real':signup?'Crea tu cuenta':'Entra a tu cuenta'}</Text>
- {session?<><Text style={styles.note}>Tu perfil se guarda en la nube. Las reseñas y stories se guardan en la nube; los mensajes siguen siendo de prueba.</Text>
+ {session?<><Text style={styles.note}>Tu perfil se guarda en la nube. Las reseñas y stories se guardan en la nube; los mensajes de texto son privados entre ambas cuentas.</Text>
  <Text style={styles.label}>Nombre</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Nombre del perfil" value={name} onChangeText={setName} maxLength={80} style={styles.input}/>
  <Text style={styles.label}>@usuario</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Usuario del perfil" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={25} style={styles.input}/>
  <Text style={styles.label}>Sobre ti</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Biografía del perfil" value={bio} onChangeText={setBio} multiline maxLength={300} style={styles.input}/>
