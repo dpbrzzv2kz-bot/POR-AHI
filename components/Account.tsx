@@ -1,8 +1,12 @@
-import React,{useEffect,useState} from 'react';
-import {View,Text,TextInput,Pressable,StyleSheet} from 'react-native';
+import React,{useEffect,useRef,useState} from 'react';
+import {View,Text,TextInput,Pressable,StyleSheet,Platform} from 'react-native';
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 import {router} from 'expo-router';
+import {googleSignInEnabled,startGoogleSignIn} from '../lib/googleSignIn';
+import {createAuthFetch} from '../lib/authFetch';
+
+const googleStyles=StyleSheet.create({button:{backgroundColor:'#fff',borderRadius:12,padding:15,marginTop:12,alignItems:'center',borderWidth:1,borderColor:'#c7cec4'},text:{color:'#243d31',fontWeight:'600'}});
 
 export type Profile={display_name:string;username:string|null;bio:string};
 export default function Account({onProfileChange}:{onProfileChange:(profile:Profile|null)=>void}){
@@ -11,6 +15,15 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  const [name,setName]=useState(''),[username,setUsername]=useState(''),[bio,setBio]=useState('');
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[profileReady,setProfileReady]=useState(false);
  const [profileLoading,setProfileLoading]=useState(false),[loadAttempt,setLoadAttempt]=useState(0);
+ const [googleEnabled,setGoogleEnabled]=useState(false),[googleRetry,setGoogleRetry]=useState(false),[providerAttempt,setProviderAttempt]=useState(0);
+ const googleLock=useRef(false);
+ useEffect(()=>{
+  const url=process.env.EXPO_PUBLIC_SUPABASE_URL,key=process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if(Platform.OS!=='web'||!url||!key||session)return;
+  let active=true;const controller=new AbortController();
+  googleSignInEnabled(url,key,createAuthFetch(),controller.signal).then(enabled=>{if(active){setGoogleEnabled(enabled);setGoogleRetry(false);}}).catch(()=>{if(active){setGoogleEnabled(false);setGoogleRetry(true);}});
+  return()=>{active=false;controller.abort();};
+ },[session,providerAttempt]);
  useEffect(()=>{
   if(!supabase){setLoading(false);return;}
   let active=true;
@@ -46,6 +59,13 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
    else if(signup&&!result.data.session){setNotice('Revisa tu correo para confirmar la cuenta. Después vuelve aquí e inicia sesión.');setPassword('');}
   }catch{setNotice('No hay conexión. Intenta de nuevo.');}finally{setBusy(false);}
  };
+ const google=async()=>{
+  if(!supabase||googleLock.current||!googleEnabled||Platform.OS!=='web')return;
+  googleLock.current=true;setBusy(true);setNotice('');setPassword('');
+  try{const destination=await startGoogleSignIn(supabase.auth,process.env.EXPO_PUBLIC_SUPABASE_URL!);window.location.assign(destination);}
+  catch(error){setNotice(error instanceof Error?error.message:'No se pudo abrir Google.');}
+  finally{googleLock.current=false;setBusy(false);}
+ };
  const save=async()=>{
   if(!session||!supabase)return;
   if(!profileReady){setNotice('Primero pulsa Reintentar carga para recuperar tu perfil.');return;}
@@ -73,6 +93,8 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  {!profileReady&&!profileLoading&&button('Reintentar carga',()=>setLoadAttempt(n=>n+1))}
  {button('Cerrar sesión',async()=>{setBusy(true);try{const {error}=await supabase!.auth.signOut();if(error)setNotice('No se pudo cerrar la sesión. Intenta de nuevo.');}catch{setNotice('No hay conexión.');}finally{setBusy(false);}})}
  </>:<><Text style={styles.note}>Puedes explorar sin cuenta. Regístrate para guardar tu perfil.</Text>
+ {googleEnabled&&<><Pressable accessibilityRole="button" disabled={busy} onPress={google} style={[googleStyles.button,busy&&{opacity:.5}]}><Text style={googleStyles.text}>Continuar con Google</Text></Pressable><Text style={styles.note}>Usa la misma cuenta de Google cada vez. Si ya tienes una cuenta aquí, utiliza el mismo correo para conservar tu perfil.</Text><Text style={styles.label}>O entra con tu correo</Text></>}
+ {googleRetry&&button('Reintentar opciones de acceso',()=>setProviderAttempt(n=>n+1))}
  <Text style={styles.label}>Correo</Text><TextInput accessibilityLabel="Correo de la cuenta" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" style={styles.input}/>
  <Text style={styles.label}>Contraseña</Text><TextInput accessibilityLabel="Contraseña de la cuenta" value={password} onChangeText={setPassword} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.input}/>
  {button(busy?'Conectando…':signup?'Crear cuenta':'Iniciar sesión',action)}
