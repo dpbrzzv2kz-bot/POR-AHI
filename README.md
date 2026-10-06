@@ -173,3 +173,53 @@ Validación: TypeScript de app/pruebas pasa. ESLint 0 errores y 30 avisos existe
 Publicación real: Netlify deploy 6ac51d0e662634d322a5e357 (2026-10-06, panel Published at 10:08 AM). El DOM de https://incredible-crumble-34cbca.netlify.app/ sirve web-preview/_expo/static/js/web/entry-dddfa0887deae8892dc752c39a17287d.js. Paquete ../por-ahi-google.zip; conserva SPA y cabeceras de callback.
 
 Prueba real en el navegador de Codex: Perfil → Continuar con Google → selección de la cuenta personal autorizada → consentimiento únicamente de nombre/foto y correo → retorno a /?account=1. Abrió el perfil existente @gusto (Daniel Pe), conservó su biografía, sus 2 publicaciones y el botón Administración. No se pulsó Guardar perfil ni se modificaron publicaciones o permisos de administrador. El fragmento de credenciales fue retirado de la URL; al recargar permaneció la misma sesión y el mismo perfil. Evidencias: ../google-acceso-publicado.png (botón público) y ../google-acceso-verificado.png (perfil real después de recargar). La prueba física desde Safari/iPhone y la integración de Google en la app nativa siguen pendientes. La captura ../google-acceso-preparado.png anterior corresponde al fixture local, no a esta prueba real.
+
+## Verificación integrada de la beta (2026-10-06)
+
+El dueño pidió que el agente realizara las pruebas entre cuentas. Se verificaron por separado la base de datos real y los recorridos de pantalla en un entorno local aislado. No se invitó a personas ni se crearon cuentas de Google externas. No se cambiaron contraseñas, se enviaron correos o se desactivaron protecciones de autenticación.
+
+### Supabase real: 58 de 58 comprobaciones
+
+`supabase/verify_beta_rollback.sql` crea tres identidades sintéticas sin contraseña ni sesión de acceso, perfiles y metadatos de archivo dentro de una transacción. Ejecuta las acciones con los roles `authenticated`/`anon` y los permisos reales de cada identidad; revierte todos los datos y funciones auxiliares al terminar. Los metadatos no son archivos subidos a Storage. No convierte esos usuarios SQL en sesiones reales de navegador.
+
+| Área | Comprobaciones | Aprobadas |
+| --- | ---: | ---: |
+| Perfiles | 7 | 7 |
+| Fotos, videos y permisos de archivos | 9 | 9 |
+| Stories | 4 | 4 |
+| Seguimiento | 5 | 5 |
+| Me gusta, guardados y comentarios | 10 | 10 |
+| Notificaciones | 3 | 3 |
+| Mensajes | 11 | 11 |
+| Reportes y bloqueo | 9 | 9 |
+| Total | 58 | 58 |
+
+Cubre publicación propia y rechazo de suplantación; autor obtenido del perfil; privacidad de borradores; foto/video separados; rechazo de archivo inexistente, vacío o demasiado grande; expiración de story a 24 horas fijada por servidor y ocultación del medio al vencer; deduplicación de follow/like/guardado/mensaje; privacidad de guardados y mensajes; respuesta del destinatario; rechazo de lectura/envío por una tercera cuenta; comentarios con borrado reversible; avisos y lectura; bloqueo y recuperación del historial al desbloquear sin restaurar el seguimiento.
+
+Una consulta posterior independiente comprobó 0 usuarios `beta-integration-...@example.invalid`, 0 perfiles con el prefijo de prueba y 0 metadatos `/beta-...` restantes. El dueño conserva sus 2 publicaciones. Evidencia: `../beta-permisos-supabase.png`; resultado del panel: `../../work/beta-db-results.txt`.
+
+### Pantallas: tres sesiones locales independientes
+
+`node tests/betaFixture.mjs .` prepara copias aisladas de la exportación web existente en `../../work/beta-preview` y sirve tres orígenes locales (puertos 8797, 8798 y 8799). Cada origen conserva su propia sesión ficticia. El script reemplaza y comprueba los destinos de producción y la clave pública del paquete; no contacta con Supabase ni Google. Es un backend de prueba en memoria, no una validación de sus propias reglas de permisos: esa verificación corresponde al SQL real anterior. No se publicó este paquete ni se cambió el código de la aplicación.
+
+Recorridos comprobados con Beta Ana, Beta Bruno y Beta Carla:
+
+- Guardar biografía, recargar y conservar perfil; buscar por `@usuario` y abrir otro perfil.
+- Publicar foto PNG de 7,692,290 bytes, video MP4 de 8 MiB y story MP4 corta; verlos desde otra cuenta. Reseñas separadas en Fotos/Videos y story independiente. Ambos videos decodificados a 320 × 480, duración 3.9196 s y readyState 4.
+- Seguir, ver el feed Siguiendo, dar me gusta y guardar; conservar seguimiento y biblioteca al recargar la segunda sesión sin mezclar el perfil de la autora.
+- Publicar comentario, borrar y deshacer; observar los contadores. Recibir avisos de follow/like/comment y marcar como leídos.
+- Abrir conversación y provocar una respuesta 503 en el primer envío: el texto permaneció en el formulario. Reintentar envió una sola copia; la destinataria recibió el mensaje y respondió. La tercera sesión tuvo la bandeja vacía. El backend local terminó con exactamente 2 mensajes de ese intercambio.
+- Registrar un reporte ficticio; bloquear desde el perfil, comprobar que desaparece el chat, desbloquear y recuperar los 2 mensajes sin volver a seguir automáticamente.
+- Cerrar sesión: desapareció el perfil de Beta Carla y volvió el formulario de acceso.
+
+La primera pasada del fixture no ordenaba los mensajes como PostgREST. Se corrigió únicamente el fixture para devolver el orden descendente solicitado por el cliente. Una segunda pasada, con `BETA_ORDER_RECHECK=1`, creó dos mensajes de referencia y verificó que la pantalla los mostrara cronológicamente; un tercer mensaje enviado desde la vista móvil llegó a la otra sesión. No se detectó un fallo de orden en el código de la aplicación.
+
+El cambio de viewport del navegador no se aplicó efectivamente (la página seguía midiendo 1280 px). Por ello se comprobó la vista móvil en un iframe local de 393 × 852 px: tanto el ancho del documento como el del contenido midieron 393 px, sin desbordamiento horizontal. Se probaron navegación, apertura de conversación, campo de texto y envío dentro de esa vista. Esto comprueba el diseño web a ese ancho; no emula Safari, teclado de iOS ni hardware de un iPhone.
+
+Trazas sin credenciales reales: `../../work/beta-browser-results.json` y `../../work/beta-mobile-results.json`. Evidencias: `../beta-mensaje-reintento.png`, `../beta-story-video.png` y `../beta-vista-movil.png`. El servidor local se detuvo y sus pestañas temporales se cerraron al terminar.
+
+### Comprobaciones técnicas y alcance pendiente
+
+TypeScript de aplicación y pruebas pasa. Los tres archivos `tests/googleSignIn.test.mts`, `tests/passwordRecovery.test.mts` y `tests/resumable.test.mts` pasan con 23 resultados, contando grupos, 0 fallos. ESLint: 0 errores, 30 advertencias existentes en la aplicación; el nuevo fixture no tiene diagnósticos. La versión pública continúa en el deploy de Google indicado arriba; no fue necesario publicar una actualización para estas pruebas.
+
+Queda pendiente un recorrido autenticado entre dos cuentas reales sobre la web publicada, incluida una carga TUS a Storage real. También requiere un dispositivo físico la prueba de cámara/selector de fotos, teclado, permisos de Safari, reproducción de clips de iPhone y fallos de red móvil. Estas pruebas no constituyen una beta con usuarios humanos ni una prueba de rendimiento/carga masiva. Google continúa configurado en modo de pruebas y el correo SMTP externo sigue pendiente, como se documenta en los bloques anteriores.
