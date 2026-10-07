@@ -3,11 +3,14 @@ import {View,Text,TextInput,Pressable,ScrollView,KeyboardAvoidingView,Platform,S
 import {supabase} from '../lib/supabase';
 import {loadPosts,type Review} from '../lib/posts';
 import {deleteOwnContent,editOwnReview,pendingContent,type ContentTarget} from '../lib/ownContent';
+import {palette as p} from '../lib/theme';
+import ui from '../lib/uiStyles';
+import ScreenHeader from './ScreenHeader';
 
 export type ContentAction=ContentTarget&{owner:string;label:string;review?:Review;pending?:boolean};
 const connection={url:process.env.EXPO_PUBLIC_SUPABASE_URL||'',key:process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY||''};
-function ContentButton({label,onPress,disabled=false}:{label:string;onPress:()=>void;disabled?:boolean}){
- return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[s.button,disabled&&{opacity:.5}]}><Text style={s.buttonText}>{label}</Text></Pressable>;
+function ContentButton({label,onPress,disabled=false,danger=false,secondary=false}:{label:string;onPress:()=>void;disabled?:boolean;danger?:boolean;secondary?:boolean}){
+ return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[secondary?ui.secondary:ui.button,danger&&ui.danger,disabled&&{opacity:.5}]}><Text style={[ui.buttonText,danger&&ui.dangerText]}>{label}</Text></Pressable>;
 }
 export function ContentEditor({action,close,changed,withdrawn,done,busyChange}:{action:ContentAction;close:()=>void;changed:(review:Review)=>void;withdrawn:(target:ContentTarget)=>void;done:()=>void;busyChange:(value:boolean)=>void}){
  const [review,setReview]=React.useState(action.review),[place,setPlace]=React.useState(action.review?.place||''),[category,setCategory]=React.useState(action.review?.category||'Comer'),[text,setText]=React.useState(action.review?.text||'');
@@ -36,19 +39,19 @@ export function ContentEditor({action,close,changed,withdrawn,done,busyChange}:{
   });
   if(mounted.current){done();close();}
  });
- return <KeyboardAvoidingView style={s.screen} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.form}>
- {button('Cerrar',close)}<Text style={s.title}>{removing?'Eliminar '+(action.kind==='story'?'story':'reseña'):'Editar reseña'}</Text><Text style={s.body}>{action.label}</Text>
+ return <KeyboardAvoidingView style={s.screen} behavior={Platform.OS==='ios'?'padding':undefined}><ScreenHeader close={close} disabled={busy}/><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.form}>
+ <Text style={ui.kicker}>{removing?'TU CONTENIDO · ELIMINACIÓN':'TU CONTENIDO · EDICIÓN'}</Text><Text style={s.title}>{removing?'Eliminar '+(action.kind==='story'?'story':'reseña'):'Afina tu reseña.'}</Text><Text style={s.body}>{action.label}</Text>
  {removing?<>
   <Text style={s.body}>{started?'La publicación ya se retiró de la comunidad. Falta completar el borrado del archivo.':'Se retirará la publicación y se eliminará su foto o video.'} {action.kind==='post'?'También se quitarán sus comentarios, likes y guardados. ':''}Esta acción no se puede deshacer.</Text>
   <Text style={s.label}>Escribe ELIMINAR para confirmar</Text><TextInput accessibilityLabel="Confirmar eliminación de publicación" editable={!busy} value={confirmation} onChangeText={setConfirmation} autoCapitalize="characters" autoCorrect={false} maxLength={8} style={s.input}/>
-  <ContentButton label={busy?'Eliminando…':started?'Reintentar eliminación':'Eliminar definitivamente'} onPress={remove} disabled={busy||confirmation!=='ELIMINAR'}/>
+  <ContentButton label={busy?'Eliminando…':started?'Reintentar eliminación':'Eliminar definitivamente'} onPress={remove} disabled={busy||confirmation!=='ELIMINAR'} danger/>
   {!started&&action.review&&button('Volver a editar',()=>{setRemoving(false);setError('');})}
   <Text style={s.note}>Si falla la conexión, podrás continuar desde «Eliminaciones pendientes» en tu perfil.</Text>
  </>:<>
   <Text style={s.label}>Lugar</Text><TextInput accessibilityLabel="Editar lugar" editable={!busy} value={place} onChangeText={setPlace} maxLength={100} style={s.input}/>
-  <Text style={s.label}>Categoría</Text><View style={s.categories}>{['Comer','Divertirse','Explorar'].map(c=><Pressable accessibilityRole="button" accessibilityState={{selected:category===c}} disabled={busy} key={c} onPress={()=>setCategory(c)} style={[s.chip,category===c&&s.selected]}><Text style={{color:category===c?'white':'#243d31'}}>{c}</Text></Pressable>)}</View>
+  <Text style={s.label}>Categoría</Text><View style={s.categories}>{['Comer','Divertirse','Explorar'].map(c=><Pressable accessibilityRole="button" accessibilityState={{selected:category===c}} disabled={busy} key={c} onPress={()=>setCategory(c)} style={[s.chip,category===c&&s.selected]}><Text style={{color:category===c?p.onDark:p.ink,fontSize:12,fontWeight:'600'}}>{c}</Text></Pressable>)}</View>
   <Text style={s.label}>Detalles</Text><TextInput accessibilityLabel="Editar detalles" editable={!busy} value={text} onChangeText={setText} multiline maxLength={1500} style={[s.input,{minHeight:140}]}/>
-  <ContentButton label={busy?'Guardando…':'Guardar cambios'} onPress={save} disabled={busy}/><ContentButton label="Volver a cargar la reseña" onPress={reload} disabled={busy}/>
+  <ContentButton label={busy?'Guardando…':'Guardar cambios'} onPress={save} disabled={busy}/><ContentButton label="Volver a cargar la reseña" onPress={reload} disabled={busy} secondary/>
   <Text style={s.note}>Volver a cargar reemplaza lo que escribiste por la versión guardada. La foto o video conserva su archivo original.</Text>
   {button('Eliminar esta reseña',()=>{setRemoving(true);setError('');})}
  </>}
@@ -61,4 +64,4 @@ export function PendingContent({userId,version,open}:{userId:string;version:numb
  if(!items.length&&!error)return null;
  return <View style={s.pending}><Text style={s.label}>Eliminaciones pendientes</Text>{items.map(item=><Pressable key={item.kind+item.id} accessibilityRole="button" onPress={()=>open({...item,pending:true,owner:userId,label:'Publicación retirada · '+item.id.slice(0,8)})} style={s.button}><Text style={s.buttonText}>Continuar borrado de {item.kind==='post'?'reseña':'story'}</Text></Pressable>)}{!!error&&<><Text accessibilityRole="alert" style={s.error}>{error}</Text><Pressable accessibilityRole="button" onPress={()=>setAttempt(n=>n+1)} style={s.button}><Text style={s.buttonText}>Revisar pendientes</Text></Pressable></>}</View>;
 }
-const s=StyleSheet.create({screen:{flex:1,backgroundColor:'#faf9f5'},form:{padding:22,paddingTop:Platform.OS==='ios'?60:24,maxWidth:590,width:'100%',alignSelf:'center'},title:{fontSize:28,fontWeight:'700',color:'#243d31',marginVertical:18},body:{fontSize:15,lineHeight:24,color:'#536350',marginBottom:16},label:{fontSize:14,color:'#334b3b',marginTop:18,marginBottom:10},input:{padding:15,borderRadius:12,backgroundColor:'#e9eee4',color:'#243d31',fontSize:16},button:{padding:16,borderRadius:12,backgroundColor:'#965337',marginVertical:6,alignItems:'center',minHeight:48},buttonText:{color:'white',fontWeight:'600'},categories:{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:14},chip:{padding:12,borderRadius:22,backgroundColor:'#e6ecdf',minHeight:44},selected:{backgroundColor:'#935136'},note:{fontSize:12,lineHeight:20,color:'#536350',marginVertical:12},error:{fontSize:14,lineHeight:22,color:'#9c3d24',marginVertical:12},pending:{padding:16,backgroundColor:'#eef1e8',borderRadius:16,marginBottom:16}});
+const s=StyleSheet.create({...ui,form:ui.content,button:ui.secondary,buttonText:ui.secondaryText,categories:{flexDirection:'row',flexWrap:'wrap',gap:8,marginBottom:14},chip:{padding:12,borderRadius:14,backgroundColor:p.surface,borderWidth:1,borderColor:p.line,minHeight:44},selected:{backgroundColor:p.ink,borderColor:p.ink},pending:{padding:16,backgroundColor:p.violetSoft,borderRadius:18,marginBottom:16}});

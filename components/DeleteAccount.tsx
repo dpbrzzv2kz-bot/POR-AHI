@@ -5,6 +5,8 @@ import {supabase} from '../lib/supabase';
 import {deletionPending,deleteOwnAccount,DELETE_CONFIRMATION,type DeletionProgress} from '../lib/accountDeletion';
 import {privacyContact} from '../lib/legalContent';
 import useIdentity from '../lib/useIdentity';
+import {palette as p} from '../lib/theme';
+import {Brand} from './ScreenHeader';
 
 export default function DeleteAccount(){
  const {id,ready}=useIdentity();
@@ -38,7 +40,7 @@ export default function DeleteAccount(){
  const button=(label:string,onPress:()=>void,disabled=false,danger=false)=><Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[s.button,danger&&s.danger,disabled&&s.disabled]}><Text style={s.buttonText}>{label}</Text></Pressable>;
  return <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={s.page}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
   {!busy&&<Link href="/?account=1" style={s.link}>← Volver a mi perfil</Link>}
-  <Text accessibilityRole="header" style={s.title}>{deleted?'Cuenta eliminada':'Eliminar cuenta'}</Text>
+  <View style={{marginTop:24}}><Brand/></View><Text accessibilityRole="header" style={s.title}>{deleted?'Cuenta eliminada':'Eliminar cuenta'}</Text>
   {deleted?<><Text style={s.body}>Se ha eliminado la cuenta de la base activa de Por Ahí y se han retirado sus archivos. El proceso no elimina tu cuenta de Google.</Text>{button('Volver a explorar',()=>router.replace('/'))}</>:<>
    <Text style={s.body}>Esto es permanente. Guarda una copia de lo que quieras conservar antes de continuar.</Text>
    <View style={s.warning}><Text style={s.heading}>Lo que se eliminará</Text><Text style={s.body}>Tu perfil, fotos, videos, reseñas, stories y su actividad asociada: likes, guardados, comentarios, seguimiento, avisos, bloqueos y reportes.</Text><Text style={s.body}>También desaparecerán tus conversaciones completas para ambas personas, incluidos los mensajes de la otra cuenta. Las copias que otras personas hayan descargado y los registros o respaldos de proveedores pueden permanecer fuera de la base activa.</Text></View>
@@ -56,4 +58,4 @@ export default function DeleteAccount(){
   </>}
  </ScrollView></KeyboardAvoidingView>;
 }
-const s=StyleSheet.create({page:{flex:1,backgroundColor:'#fbf9f4'},content:{padding:24,paddingTop:45,paddingBottom:65,maxWidth:620,width:'100%',alignSelf:'center'},title:{fontSize:28,fontWeight:'700',color:'#243d31',marginTop:24},heading:{fontSize:17,fontWeight:'700',color:'#243d31'},body:{fontSize:15,lineHeight:24,color:'#334b3b',marginTop:16},warning:{padding:18,backgroundColor:'#fff0e9',borderRadius:14,marginTop:20},link:{fontSize:15,color:'#965337',textDecorationLine:'underline',marginTop:18},check:{marginTop:8},input:{borderWidth:1,borderColor:'#acb7a7',borderRadius:12,padding:14,fontSize:17,backgroundColor:'#fff',marginTop:12,color:'#243d31'},button:{backgroundColor:'#965337',padding:16,borderRadius:12,alignItems:'center',marginTop:18},danger:{backgroundColor:'#a53535'},disabled:{opacity:.4},buttonText:{color:'#fff',fontWeight:'600',fontSize:15},error:{backgroundColor:'#fff',color:'#a53535',padding:14,borderRadius:12,marginTop:18,lineHeight:23}});
+const s=StyleSheet.create({page:{flex:1,backgroundColor:p.canvas},content:{padding:24,paddingTop:Platform.OS==='ios'?60:24,paddingBottom:65,maxWidth:620,width:'100%',alignSelf:'center'},title:{fontSize:30,lineHeight:36,fontWeight:'900',letterSpacing:-.8,color:p.ink,marginTop:24},heading:{fontSize:17,fontWeight:'800',color:p.ink},body:{fontSize:14,lineHeight:24,color:p.ink,marginTop:16},warning:{padding:18,backgroundColor:'#FDEEF0',borderRadius:20,marginTop:20},link:{fontSize:13,fontWeight:'600',color:p.violet,textDecorationLine:'underline',marginTop:18,minHeight:44,paddingTop:12},check:{marginTop:8,minHeight:44},input:{borderWidth:1,borderColor:p.line,borderRadius:15,padding:15,fontSize:17,backgroundColor:p.surface,marginTop:12,color:p.ink},button:{backgroundColor:p.ink,padding:16,borderRadius:15,minHeight:48,alignItems:'center',justifyContent:'center',marginTop:18},danger:{backgroundColor:p.error},disabled:{opacity:.4},buttonText:{color:p.onDark,fontWeight:'700',fontSize:13,textAlign:'center'},error:{backgroundColor:'#FDEEF0',color:p.error,padding:14,borderRadius:14,marginTop:18,lineHeight:23}});

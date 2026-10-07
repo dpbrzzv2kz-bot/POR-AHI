@@ -7,6 +7,7 @@ import {googleSignInEnabled,startGoogleSignIn} from '../lib/googleSignIn';
 import {createAuthFetch} from '../lib/authFetch';
 import {legalReady} from '../lib/legalContent';
 import {palette as p} from '../lib/theme';
+import ui from '../lib/uiStyles';
 
 const googleStyles=StyleSheet.create({button:{backgroundColor:p.surface,borderRadius:14,minHeight:48,padding:15,marginTop:12,alignItems:'center',borderWidth:1,borderColor:p.line},text:{color:p.ink,fontWeight:'700'}});
 
@@ -83,7 +84,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
    else if(data){setName(data.display_name);setUsername(data.username);setBio(data.bio);onProfileChange(data);setNotice('Perfil guardado en tu cuenta.');}
   }catch{setNotice('La conexión tardó demasiado o no está disponible. Vuelve a intentar guardar.');}finally{clearTimeout(timer);setBusy(false);}
  };
- const button=(text:string,onPress:()=>void,disabled=false)=><Pressable accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={[styles.button,(disabled||busy)&&{opacity:.5}]}><Text style={styles.buttonText}>{text}</Text></Pressable>;
+ const button=(text:string,onPress:()=>void,disabled=false,primary=false)=><Pressable accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={[primary?ui.button:ui.secondary,(disabled||busy)&&{opacity:.5}]}><Text style={ui.buttonText}>{text}</Text></Pressable>;
  if(!supabase)return <Text style={styles.note}>La conexión de cuentas aún no está configurada.</Text>;
  if(loading)return <Text style={styles.note}>Cargando tu cuenta…</Text>;
  if(session&&!editing)return <View style={styles.collapsed}><View style={{flex:1,minWidth:0}}><Text style={styles.accountLabel}>TU CUENTA</Text><Text style={styles.compactNote}>Nombre, @usuario y biografía</Text></View><Pressable accessibilityRole="button" disabled={busy} onPress={()=>setEditingUser(session.user.id)} style={styles.editButton}><Text style={styles.editText}>Editar perfil</Text></Pressable></View>;
@@ -94,7 +95,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  <Text style={styles.label}>Sobre ti</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Biografía del perfil" value={bio} onChangeText={setBio} multiline maxLength={300} style={styles.input}/>
  <Text style={styles.note}>Puedes escribir el usuario con @ y mayúsculas; lo guardaremos en minúsculas.</Text>
  {!!notice&&<Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.feedback}>{notice}</Text>}
- {button(profileLoading?'Cargando perfil…':busy?'Guardando…':'Guardar perfil',save,profileLoading)}
+ {button(profileLoading?'Cargando perfil…':busy?'Guardando…':'Guardar perfil',save,profileLoading,true)}
  {!profileReady&&!profileLoading&&button('Reintentar carga',()=>setLoadAttempt(n=>n+1))}
  {button('Cerrar sesión',async()=>{setBusy(true);try{const {error}=await supabase!.auth.signOut();if(error)setNotice('No se pudo cerrar la sesión. Intenta de nuevo.');}catch{setNotice('No hay conexión.');}finally{setBusy(false);}})}
  <Pressable accessibilityRole="button" disabled={busy} onPress={()=>setEditingUser(null)} style={styles.secondary}><Text style={styles.secondaryText}>Cerrar edición del perfil</Text></Pressable>
@@ -104,7 +105,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  {googleRetry&&button('Reintentar opciones de acceso',()=>setProviderAttempt(n=>n+1))}
  <Text style={styles.label}>Correo</Text><TextInput accessibilityLabel="Correo de la cuenta" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" style={styles.input}/>
  <Text style={styles.label}>Contraseña</Text><TextInput accessibilityLabel="Contraseña de la cuenta" value={password} onChangeText={setPassword} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.input}/>
- {button(busy?'Conectando…':signup?'Crear cuenta':'Iniciar sesión',action)}
+ {button(busy?'Conectando…':signup?'Crear cuenta':'Iniciar sesión',action,false,true)}
  {!signup&&button('Olvidé mi contraseña',()=>{setPassword('');router.push('/forgot-password');})}
  {button(signup?'Ya tengo cuenta':'Quiero registrarme',()=>{setSignup(!signup);setNotice('');setPassword('');})}</>}
  {!session&&!!notice&&<Text accessibilityRole="alert" style={styles.note}>{notice}</Text>}

@@ -3,6 +3,9 @@ import {View,Text,Pressable,ScrollView,StyleSheet,Platform} from 'react-native';
 import {router} from 'expo-router';
 import {googleCallback,supabase} from '../lib/supabase';
 import {finishGoogleSignIn,GoogleConnectionError} from '../lib/googleSignIn';
+import {palette as p} from '../lib/theme';
+import ui from '../lib/uiStyles';
+import {Brand} from './ScreenHeader';
 
 export default function GoogleCallback(){
  const [attempt,setAttempt]=useState(0),[notice,setNotice]=useState(''),[state,setState]=useState<'checking'|'retry'|'error'>('checking');
@@ -18,10 +21,10 @@ export default function GoogleCallback(){
   });
   return()=>{active=false;};
  },[attempt]);
- return <ScrollView contentContainerStyle={s.screen}><View style={s.card}><Text style={s.brand}>por ahí ↗</Text><Text accessibilityRole="header" style={s.title}>{state==='checking'?'Entrando a tu cuenta…':'Acceso con Google'}</Text>
+ return <ScrollView contentContainerStyle={s.screen}><View style={s.card}><View style={{marginBottom:28}}><Brand/></View><Text accessibilityRole="header" style={s.title}>{state==='checking'?'Entrando a tu cuenta…':'Acceso con Google'}</Text>
  <Text accessibilityRole={notice?'alert':undefined} accessibilityLiveRegion="polite" style={s.note}>{notice||'Estamos comprobando tu sesión para abrir tu perfil.'}</Text>
  {state==='retry'&&<Pressable accessibilityRole="button" style={s.button} onPress={()=>{if(needsReload.current&&Platform.OS==='web'){window.location.reload();return;}setNotice('');setState('checking');setAttempt(n=>n+1);}}><Text style={s.buttonText}>Reintentar</Text></Pressable>}
- <Pressable accessibilityRole="button" style={s.button} onPress={()=>router.replace('/?account=1')}><Text style={s.buttonText}>Volver a mi cuenta</Text></Pressable>
+ <Pressable accessibilityRole="button" style={ui.secondary} onPress={()=>router.replace('/?account=1')}><Text style={s.buttonText}>Volver a mi cuenta</Text></Pressable>
  </View></ScrollView>;
 }
-const s=StyleSheet.create({screen:{flexGrow:1,padding:24,backgroundColor:'#fbf9f3',alignItems:'center',justifyContent:'center'},card:{width:'100%',maxWidth:460,padding:24,borderRadius:22,backgroundColor:'#eef1e8'},brand:{fontSize:25,fontWeight:'800',color:'#243d31',marginBottom:24},title:{fontSize:23,fontWeight:'700',color:'#243d31'},note:{fontSize:14,lineHeight:22,color:'#536350',marginVertical:16},button:{backgroundColor:'#965337',borderRadius:12,padding:15,marginTop:12,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'600'}});
+const s=StyleSheet.create({...ui,screen:{flexGrow:1,padding:24,backgroundColor:p.canvas,alignItems:'center',justifyContent:'center'},card:{width:'100%',maxWidth:460,padding:24,borderRadius:26,backgroundColor:p.surface,borderWidth:1,borderColor:p.line}});

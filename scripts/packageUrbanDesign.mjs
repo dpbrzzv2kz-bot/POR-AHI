@@ -8,7 +8,7 @@ const html=await readFile(resolve(source,'index.html'),'utf8');
 const entry=html.match(/src="([^"]+entry-[^"]+\.js)"/)?.[1];
 if(!entry||!html.includes('manifest.webmanifest')||!html.includes('apple-touch-icon')||!html.includes('lang="es"')||!html.includes('Por Ahí'))throw Error('Mobile web metadata missing');
 const bundle=await readFile(resolve(source,'.'+entry),'utf8');
-for(const marker of ['edit_own_review','content_management','Compartir enlace','Copiar enlace','Una recomendaci','/?review=','Hoy se sale.','Buscar rese','Ver m','#D4FF38','Dale play al plan.'])if(!bundle.includes(marker))throw Error('Feature missing: '+marker);
+for(const marker of ['edit_own_review','content_management','Compartir enlace','Copiar enlace','Una recomendaci','/?review=','Hoy se sale.','Buscar rese','Ver m','#D4FF38','Dale play al plan.','SU RECOMENDACI','La conversaci','Tu comunidad','Afina tu rese','Recupera tu cuenta'])if(!bundle.includes(marker))throw Error('Feature missing: '+marker);
 if(!bundle.includes('https://bxsllqteuafbusruspqd.supabase.co')||bundle.includes('http://127.0.0.1:8797'))throw Error('Wrong production endpoint');
 try{await stat(target);throw Error('Use a fresh release directory; do not mix exports');}catch(e){if(e.code!=='ENOENT')throw e;}
 await mkdir(target,{recursive:true});

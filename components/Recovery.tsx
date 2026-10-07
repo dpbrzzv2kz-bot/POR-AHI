@@ -3,12 +3,15 @@ import {View,Text,TextInput,Pressable,ScrollView,StyleSheet,KeyboardAvoidingView
 import {router} from 'expo-router';
 import {supabase,recoveryAccess} from '../lib/supabase';
 import {requestRecovery,changeRecoveredPassword,RecoveryAccessError,RecoveryConnectionError} from '../lib/passwordRecovery';
+import {palette as p} from '../lib/theme';
+import ui from '../lib/uiStyles';
+import {Brand} from './ScreenHeader';
 
-function RecoveryButton({label,onPress,disabled=false}:{label:string;onPress:()=>void;disabled?:boolean}){
- return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[s.button,disabled&&s.disabled]}><Text style={s.buttonText}>{label}</Text></Pressable>;
+function RecoveryButton({label,onPress,disabled=false,secondary=false}:{label:string;onPress:()=>void;disabled?:boolean;secondary?:boolean}){
+ return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[s.button,secondary&&ui.secondary,disabled&&s.disabled]}><Text style={s.buttonText}>{label}</Text></Pressable>;
 }
 function Frame({children}:{children:React.ReactNode}){
- return <KeyboardAvoidingView style={s.screen} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.container}><View style={s.card}><Text style={s.brand}>por ahí ↗</Text>{children}</View></ScrollView></KeyboardAvoidingView>;
+ return <KeyboardAvoidingView style={s.screen} behavior={Platform.OS==='ios'?'padding':undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.container}><View style={s.card}><View style={{marginBottom:28}}><Brand/></View>{children}</View></ScrollView></KeyboardAvoidingView>;
 }
 export function ForgotPassword(){
  const [email,setEmail]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[cooldown,setCooldown]=useState(0);
@@ -28,7 +31,7 @@ export function ForgotPassword(){
  {!supabase&&<Text style={s.notice}>La conexión de cuentas no está disponible.</Text>}
  <RecoveryButton label={busy?'Enviando…':cooldown?`Puedes solicitar otro en ${cooldown} s`:'Enviar enlace de recuperación'} onPress={send} disabled={!supabase||busy||cooldown>0}/>
  <Text style={s.note}>Abre el enlace en tu navegador. También funciona en Safari de tu iPhone.</Text>
- <RecoveryButton label="Volver a mi cuenta" onPress={()=>router.replace('/?account=1')} disabled={busy}/></Frame>;
+ <RecoveryButton label="Volver a mi cuenta" onPress={()=>router.replace('/?account=1')} disabled={busy} secondary/></Frame>;
 }
 
 export function ResetPassword(){
@@ -64,7 +67,7 @@ export function ResetPassword(){
  {state==='ready'&&<RecoveryButton label={busy?'Actualizando…':'Guardar nueva contraseña'} onPress={save} disabled={busy}/>}
  {state==='retry'&&<RecoveryButton label="Reintentar" onPress={()=>{if(needsReload.current&&Platform.OS==='web'){window.location.reload();return;}setNotice('');setState('checking');setAttempt(n=>n+1);}}/>}
  {(state==='invalid'||state==='retry')&&<RecoveryButton label="Solicitar nuevo enlace" onPress={()=>router.replace('/forgot-password')}/>}
- <RecoveryButton label={state==='done'?'Volver e iniciar sesión':'Volver a por ahí'} onPress={abandon} disabled={busy}/>
+ <RecoveryButton label={state==='done'?'Volver e iniciar sesión':'Volver a por ahí'} onPress={abandon} disabled={busy} secondary/>
  </Frame>;
 }
-const s=StyleSheet.create({screen:{flex:1,backgroundColor:'#fbf9f3'},container:{flexGrow:1,paddingHorizontal:20,paddingTop:60,paddingBottom:36,alignItems:'center',justifyContent:'center'},card:{width:'100%',maxWidth:460,backgroundColor:'#eef1e8',padding:24,borderRadius:22},brand:{fontSize:25,fontWeight:'800',color:'#243d31',marginBottom:24},title:{fontSize:24,fontWeight:'700',color:'#243d31'},note:{fontSize:14,lineHeight:22,color:'#536350',marginVertical:14},label:{fontSize:14,color:'#334b3b',marginTop:12,marginBottom:8},input:{padding:15,borderRadius:12,backgroundColor:'#fff',color:'#243d31',fontSize:16},notice:{fontSize:14,lineHeight:22,color:'#243d31',backgroundColor:'#fff',borderRadius:12,padding:14,marginTop:16},button:{backgroundColor:'#965337',padding:15,borderRadius:12,marginTop:14,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'600',fontSize:14},disabled:{opacity:.5}});
+const s=StyleSheet.create({...ui,container:{flexGrow:1,paddingHorizontal:20,paddingTop:Platform.OS==='ios'?60:30,paddingBottom:36,alignItems:'center',justifyContent:'center'},card:{width:'100%',maxWidth:460,backgroundColor:p.surface,borderWidth:1,borderColor:p.line,padding:24,borderRadius:26},input:{...ui.input,backgroundColor:p.soft},disabled:{opacity:.5}});
