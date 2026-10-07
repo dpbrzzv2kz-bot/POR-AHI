@@ -7,7 +7,7 @@ export type Review={id:string;category:string;place:string;text:string;author:st
 export type Story={id:string;userId:string;name:string;expires:number;media?:Media;color:string};
 const bucket='review-media';
 type PublishOptions={signal?:AbortSignal;progress?:(value:UploadProgress)=>void};
-export async function loadPosts(filter?:{userId?:string;userIds?:string[];postIds?:string[]}):Promise<Review[]>{
+export async function loadPosts(filter?:{userId?:string;userIds?:string[];postIds?:string[]},signal?:AbortSignal):Promise<Review[]>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  if(filter?.userIds&&!filter.userIds.length)return [];
  if(filter?.postIds&&!filter.postIds.length)return [];
@@ -15,10 +15,11 @@ export async function loadPosts(filter?:{userId?:string;userIds?:string[];postId
  if(filter?.userId)request=request.eq('user_id',filter.userId);
  if(filter?.userIds)request=request.in('user_id',filter.userIds);
  if(filter?.postIds)request=request.in('id',filter.postIds);
+ if(signal)request=request.abortSignal(signal);
  const {data,error}=await request;
  if(error)throw new Error('No se pudieron cargar las publicaciones. Pulsa Actualizar.');
  if(!data?.length)return [];
- const signed=await supabase.storage.from(bucket).createSignedUrls(data.map(r=>r.media_path),3600);
+ const signed=await waitForOperation(supabase.storage.from(bucket).createSignedUrls(data.map(r=>r.media_path),3600),signal);
  if(signed.error)throw new Error('No se pudieron cargar las fotos y videos. Pulsa Actualizar.');
  const urls=new Map(signed.data?.map(r=>[r.path,r.signedUrl]));
  return data.map(r=>{const uri=urls.get(r.media_path);if(!uri)throw new Error('Algún archivo no pudo cargarse. Pulsa Actualizar.');return {id:r.id,userId:r.user_id,author:r.author_name,category:r.category,place:r.place,text:r.description,version:r.edit_version,kind:r.kind,media:{uri,type:r.kind},cloud:true,color:'#2b3933',symbol:'↗'};});

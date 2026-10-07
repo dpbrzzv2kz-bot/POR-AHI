@@ -32,6 +32,18 @@ if(process.env.BETA_OWN_CONTENT==='1'){
  data.stories.push({id:randomUUID(),user_id:profiles[0].id,author_name:profiles[0].display_name,kind:'image',media_path:path,expires_at:new Date(Date.now()+86400000).toISOString(),created_at:now()});
 }
 let failDeletionOnce=process.env.BETA_DELETE_FAILURE==='1';
+let sharedReviewFailures=process.env.BETA_SHARING_FAILURE==='1'?4:0;
+if(process.env.BETA_SHARING==='1'){
+ const png=await readFile(resolve(app,'public/icons/icon-512.png'));
+ // Put Ana's seeded review beyond the newest 60 to exercise lookup by ID.
+ for(let i=0;i<63;i++){
+  const path=`${profiles[1].id}/sharing-${i}.png`;files.set(path,{bytes:png,mime:'image/png'});
+  data.posts.push({id:randomUUID(),user_id:profiles[1].id,author_name:profiles[1].display_name,place:'Ejemplo reciente '+i,category:'Explorar',description:'Dato ficticio para probar un enlace a una reseña antigua.',kind:'image',media_path:path,edit_version:0,created_at:now()});
+ }
+ const path=`${profiles[0].id}/sharing-video.mp4`,video=await readFile(resolve(app,'../../work/media-fixtures/video-base.mp4'));
+ files.set(path,{bytes:video,mime:'video/mp4'});
+ data.posts.push({id:randomUUID(),user_id:profiles[0].id,author_name:profiles[0].display_name,place:'Video de prueba para compartir',category:'Divertirse',description:'Video ficticio reproducible por enlace.',kind:'video',media_path:path,edit_version:0,created_at:now()});
+}
 if(failDeletionOnce)files.set(`${profiles[2].id}/delete-test.png`,{bytes:Buffer.from('Synthetic local file'),mime:'image/png'});
 let failMessageOnce=true;
 
@@ -149,6 +161,7 @@ async function handle(req,res,port){try{
  if(path.startsWith('/rest/v1/rpc/')){await bytes(req);reply(res,path.endsWith('is_moderator')?false:[]);return;}
  if(path.startsWith('/rest/v1/')){
   const table=path.split('/').at(-1);
+  if(table==='posts'&&req.method==='GET'&&url.searchParams.get('id')?.startsWith('in.')&&sharedReviewFailures>0){sharedReviewFailures--;event('simulated_shared_review_failure',uid);reply(res,{message:'Synthetic temporary failure'},503);return;}
   if(!['GET','HEAD'].includes(req.method)){
    if(!uid){reply(res,{code:'42501',message:'Local session required'},403);return;}
    const row=await body(req);
