@@ -1,2 +1,4 @@
 import LegalPage from '../../components/LegalPage';
-export default function Terms(){return <LegalPage kind="terms"/>;}
+import {Redirect} from 'expo-router';
+import {legalReady} from '../../lib/legalContent';
+export default function Terms(){return legalReady?<LegalPage kind="terms"/>:<Redirect href="/"/>;}

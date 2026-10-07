@@ -20,6 +20,17 @@ const session=id=>({access_token:tokens.get(id),refresh_token:`local-refresh-${i
 const data={posts:[],stories:[],follows:[],post_likes:[],bookmarks:[],comments:[],notifications:[],conversations:[],messages:[],user_blocks:[],content_reports:[]};
 const files=new Map(),uploads=new Map(),events=[];
 const deleting=new Set();
+const contentDeletions=new Map();
+let failContentOnce=process.env.BETA_CONTENT_FAILURE==='1';
+if(process.env.BETA_OWN_CONTENT==='1'){
+ const png=await readFile(resolve(app,'public/icons/icon-512.png'));
+ for(const [i,p] of profiles.slice(0,2).entries()){
+  const path=`${p.id}/review-fixture.png`;files.set(path,{bytes:png,mime:'image/png'});
+  data.posts.push({id:randomUUID(),user_id:p.id,author_name:p.display_name,place:['Café de prueba Ana','Museo de prueba Bruno'][i],category:i?'Explorar':'Comer',description:'Reseña ficticia para editar y eliminar.',kind:'image',media_path:path,edit_version:0,created_at:now()});
+ }
+ const path=`${profiles[0].id}/story-fixture.png`;files.set(path,{bytes:png,mime:'image/png'});
+ data.stories.push({id:randomUUID(),user_id:profiles[0].id,author_name:profiles[0].display_name,kind:'image',media_path:path,expires_at:new Date(Date.now()+86400000).toISOString(),created_at:now()});
+}
 let failDeletionOnce=process.env.BETA_DELETE_FAILURE==='1';
 if(failDeletionOnce)files.set(`${profiles[2].id}/delete-test.png`,{bytes:Buffer.from('Synthetic local file'),mime:'image/png'});
 let failMessageOnce=true;
@@ -39,9 +50,9 @@ for(const port of ports){
 
 const bytes=async req=>{const parts=[];for await(const part of req)parts.push(part);return Buffer.concat(parts);};
 const body=async req=>JSON.parse((await bytes(req)).toString()||'{}');
-const reply=(res,value,status=200,headers={})=>res.writeHead(status,{'Content-Type':'application/json',...headers}).end(JSON.stringify(value));
+const reply=(res,value,status=200,headers={})=>res.writeHead(status,{'Content-Type':'application/json','X-Supabase-Api-Version':'2024-01-01',...headers}).end(JSON.stringify(value));
 const blocked=(a,b)=>!!a&&data.user_blocks.some(r=>(r.blocker_id===a&&r.blocked_id===b)||(r.blocker_id===b&&r.blocked_id===a));
-const visiblePost=(id,uid)=>data.posts.some(p=>p.id===id&&!blocked(uid,p.user_id));
+const visiblePost=(id,uid)=>data.posts.some(p=>p.id===id&&!blocked(uid,p.user_id)&&!contentDeletions.has('post:'+p.id));
 const accessibleChat=(id,uid)=>data.conversations.some(c=>c.id===id&&[c.user_low,c.user_high].includes(uid)&&!blocked(uid,c.user_low===uid?c.user_high:c.user_low));
 const event=(type,uid,extra={})=>events.push({type,actor:profiles.find(p=>p.id===uid)?.username || 'visitor',...extra});
 const notice=(recipient,actor,kind,post=null,comment=null)=>{
@@ -59,8 +70,8 @@ const filter=(rows,url)=>rows.filter(row=>[...url.searchParams].every(([key,valu
 const tableRows=(table,uid)=>{
  if(table==='profiles')return profiles.filter(p=>p.id===uid);
  if(table==='public_profiles')return profiles.filter(p=>!blocked(uid,p.id));
- if(table==='posts'||table==='stories')return data[table].filter(p=>!blocked(uid,p.user_id)&&(table!=='stories'||Date.parse(p.expires_at)>Date.now()));
- if(table==='post_stats')return data.posts.map(p=>({post_id:p.id,likes_count:data.post_likes.filter(r=>r.post_id===p.id).length,comments_count:data.comments.filter(r=>r.post_id===p.id&&!r.deleted_at).length}));
+ if(table==='posts'||table==='stories')return data[table].filter(p=>!blocked(uid,p.user_id)&&!contentDeletions.has((table==='posts'?'post:':'story:')+p.id)&&(table!=='stories'||Date.parse(p.expires_at)>Date.now()));
+ if(table==='post_stats')return data.posts.filter(p=>visiblePost(p.id,uid)).map(p=>({post_id:p.id,likes_count:data.post_likes.filter(r=>r.post_id===p.id).length,comments_count:data.comments.filter(r=>r.post_id===p.id&&!r.deleted_at).length}));
  if(['follows','post_likes','bookmarks','notifications','user_blocks','content_reports'].includes(table))return data[table].filter(r=>(r.follower_id||r.user_id||r.recipient_id||r.blocker_id||r.reporter_id)===uid&&(!r.recipient_id||!r.withdrawn_at&&!blocked(uid,r.actor_id)));
  if(table==='comments')return data.comments.filter(r=>visiblePost(r.post_id,uid)&&!blocked(uid,r.user_id)&&(!r.deleted_at||r.user_id===uid));
  if(table==='conversations')return data.conversations.filter(c=>accessibleChat(c.id,uid));
@@ -80,7 +91,7 @@ async function handle(req,res,port){try{
  if(path==='/__fixture'){
   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'}).end(`<!doctype html><meta charset="utf-8"><title>Beta local · tres cuentas ficticias</title><h1>Prueba local de Por Ahí</h1><p>Datos ficticios; sin conexión a Supabase ni Google.</p>${profiles.map((p,i)=>`<p><a href="http://127.0.0.1:${ports[i]}/auth/google#access_token=${tokens.get(p.id)}&refresh_token=local-refresh-${p.id}&token_type=bearer&expires_in=7200">Abrir ${p.display_name}</a></p>`).join('')}<p><a href="/">Explorar sin entrar</a></p><p><a href="/__mobile.html">Vista web a 393 px</a></p><p><a href="/__checks">Resultados del entorno local</a></p>`);return;
  }
- if(path==='/__checks'){reply(res,{events,profiles,counts:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,v.length])),messages:data.messages.map(m=>({body:m.body,conversation_id:m.conversation_id})),files:[...files.values()].map(f=>({size:f.bytes.length,mime:f.mime})),isolated:true});return;}
+ if(path==='/__checks'){reply(res,{events,profiles,counts:Object.fromEntries(Object.entries(data).map(([k,v])=>[k,v.length])),posts:data.posts.map(p=>({id:p.id,place:p.place,version:p.edit_version})),pending:[...contentDeletions.values()].filter(d=>!d.finished),messages:data.messages.map(m=>({body:m.body,conversation_id:m.conversation_id})),files:[...files.values()].map(f=>({size:f.bytes.length,mime:f.mime})),isolated:true});return;}
  if(path==='/auth/v1/settings'){reply(res,{external:{google:true}});return;}
  if(path==='/auth/v1/user'){reply(res,uid?userOf(uid):{code:'bad_jwt',msg:'Invalid local session'},uid?200:401);return;}
  if(path==='/auth/v1/token'){const value=await body(req),id=profiles.find(p=>value.refresh_token===`local-refresh-${p.id}`)?.id;reply(res,id?session(id):{code:'invalid_grant'},id?200:400);return;}
@@ -99,9 +110,38 @@ async function handle(req,res,port){try{
    event('account_deleted',uid);profiles.splice(profiles.findIndex(p=>p.id===uid),1);deleting.delete(uid);reply(res,{deleted:true});return;
   }
  }
+ if(path==='/rest/v1/rpc/edit_own_review'){
+  const value=await body(req),row=data.posts.find(p=>p.id===value.p_id&&p.user_id===uid);
+  if(!uid||!row||contentDeletions.has('post:'+value.p_id)){reply(res,{message:'CONTENT_UNAVAILABLE'},403);return;}
+  if(row.edit_version!==value.p_version){reply(res,{message:'EDIT_CONFLICT'},409);return;}
+  if(!['Comer','Divertirse','Explorar'].includes(value.p_category)||value.p_place.trim().length<2||value.p_place.length>100||value.p_description.length>1500){reply(res,{message:'INVALID_DETAILS'},400);return;}
+  Object.assign(row,{place:value.p_place.trim(),category:value.p_category,description:value.p_description,edit_version:row.edit_version+1});event('own_review_edited',uid,{id:row.id});reply(res,{id:row.id,version:row.edit_version});return;
+ }
+ if(path==='/rest/v1/rpc/content_management'){
+  const value=await body(req);
+  if(!uid){reply(res,{message:'SIGN_IN_REQUIRED'},403);return;}
+  if(value.p_action==='pending'){reply(res,{items:[...contentDeletions.values()].filter(d=>d.owner===uid&&!d.finished).map(d=>({kind:d.kind,id:d.id}))});return;}
+  if(value.p_confirmation!=='ELIMINAR'){reply(res,{message:'CONFIRMATION_REQUIRED'},400);return;}
+  const key=value.p_kind+':'+value.p_id,table=value.p_kind==='post'?'posts':'stories';let d=contentDeletions.get(key);
+  if(d&&d.owner!==uid){reply(res,{message:'CONTENT_UNAVAILABLE'},403);return;}
+  if(d?.finished){reply(res,{deleted:true});return;}
+  if(value.p_action==='begin'){
+   if(!d){const row=data[table].find(r=>r.id===value.p_id&&r.user_id===uid);if(!row){reply(res,{message:'CONTENT_UNAVAILABLE'},403);return;}
+    d={kind:value.p_kind,id:row.id,owner:uid,path:row.media_path,finished:false};contentDeletions.set(key,d);event('own_content_withdrawn',uid,{kind:d.kind,id:d.id});}
+   reply(res,{file:d.path,pending:true});return;
+  }
+  if(value.p_action==='finish'&&d){
+   if(files.has(d.path)){reply(res,{message:'FILES_REMAIN'},400);return;}
+   data[table]=data[table].filter(r=>r.id!==d.id);
+   if(d.kind==='post')for(const table of ['post_likes','bookmarks','comments','notifications'])data[table]=data[table].filter(r=>r.post_id!==d.id);
+   d.finished=true;event('own_content_deleted',uid,{kind:d.kind,id:d.id});reply(res,{deleted:true});return;
+  }
+  reply(res,{message:'INVALID_ACTION'},400);return;
+ }
  if(path==='/storage/v1/object/review-media'&&req.method==='DELETE'){
   const value=await body(req);
-  if(!uid||!deleting.has(uid)||value.prefixes.some(path=>!path.startsWith(`${uid}/`))){reply(res,{message:'Denied'},403);return;}
+  if(!uid||value.prefixes.some(path=>!path.startsWith(`${uid}/`)||(!deleting.has(uid)&&![...contentDeletions.values()].some(d=>d.owner===uid&&d.path===path&&!d.finished)))){reply(res,{message:'Denied'},403);return;}
+  if(failContentOnce){failContentOnce=false;reply(res,{message:'Temporary failure'},503);return;}
   if(failDeletionOnce){failDeletionOnce=false;reply(res,{message:'Temporary failure'},503);return;}
   for(const name of value.prefixes)files.delete(name);
   event('deletion_files_removed',uid,{count:value.prefixes.length});reply(res,value.prefixes.map(name=>({name})));return;

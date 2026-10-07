@@ -1,0 +1,107 @@
+-- Run after 012 (or embed 012 without its BEGIN/COMMIT inside this transaction).
+-- All fixtures, schema changes and policy grants are rolled back. No binary uploads.
+begin;
+create temporary table content_results(check_name text,passed boolean);
+grant select,insert on content_results to authenticated,anon;
+create function pg_temp.c_check(label text,ok boolean) returns void language sql as $$
+ insert into content_results values(label,coalesce(ok,false));$$;
+create function pg_temp.c_denied(label text,query text,expected text) returns void language plpgsql as $$
+begin
+ begin execute query;perform pg_temp.c_check(label,false);
+ exception when others then perform pg_temp.c_check(label,position(expected in sqlerrm)>0);end;
+end $$;
+grant execute on function pg_temp.c_check(text,boolean),pg_temp.c_denied(text,text,text) to authenticated,anon;
+select set_config('c.a',gen_random_uuid()::text,true),set_config('c.b',gen_random_uuid()::text,true),set_config('c.sa',gen_random_uuid()::text,true),set_config('c.sb',gen_random_uuid()::text,true),set_config('c.post',gen_random_uuid()::text,true),set_config('c.story',gen_random_uuid()::text,true),set_config('c.comment',gen_random_uuid()::text,true);
+create temporary table real_content_baseline as select user_id,count(*) total from public.posts group by user_id;
+insert into auth.users(id,aud,role,email) select current_setting('c.'||x)::uuid,'authenticated','authenticated','content-test-'||current_setting('c.'||x)||'@example.invalid' from unnest(array['a','b'])x;
+insert into auth.sessions(id,user_id,created_at) values(current_setting('c.sa')::uuid,current_setting('c.a')::uuid,now()),(current_setting('c.sb')::uuid,current_setting('c.b')::uuid,now());
+insert into public.profiles(id,display_name,username) select current_setting('c.'||x)::uuid,'Content test '||x,'con_'||substr(replace(current_setting('c.'||x),'-',''),1,16) from unnest(array['a','b'])x;
+insert into storage.objects(bucket_id,name,owner,owner_id,metadata)
+ select 'review-media',current_setting('c.a')||'/'||x||'.png',current_setting('c.a')::uuid,current_setting('c.a'),'{"size":100,"mimetype":"image/png"}' from unnest(array['post','story'])x;
+select set_config('request.jwt.claim.sub',current_setting('c.a'),true),set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('c.a'),'session_id',current_setting('c.sa'))::text,true);
+set local role authenticated;
+insert into public.posts(id,user_id,author_name,category,place,description,kind,media_path,edit_version) values(current_setting('c.post')::uuid,auth.uid(),'ignored','Comer','Original place','Original details','image',auth.uid()::text||'/post.png',999);
+insert into public.stories(id,user_id,author_name,kind,media_path) values(current_setting('c.story')::uuid,auth.uid(),'ignored','image',auth.uid()::text||'/story.png');
+select pg_temp.c_check('initial version forced to zero',exists(select 1 from public.posts where id=current_setting('c.post')::uuid and edit_version=0));
+select pg_temp.c_check('owner may edit details',public.edit_own_review(current_setting('c.post')::uuid,0,' Updated place ','Explorar','Updated details')->>'version'='1');
+select pg_temp.c_check('author and file remain immutable',exists(select 1 from public.posts where id=current_setting('c.post')::uuid and author_name='Content test a' and media_path=auth.uid()::text||'/post.png' and category='Explorar' and place='Updated place' and description='Updated details'));
+select pg_temp.c_denied('stale version rejected', $$select public.edit_own_review(current_setting('c.post')::uuid,0,'Old details','Comer','')$$,'EDIT_CONFLICT');
+select pg_temp.c_denied('invalid category rejected', $$select public.edit_own_review(current_setting('c.post')::uuid,1,'Valid place','Wrong','')$$,'INVALID_DETAILS');
+select pg_temp.c_denied('oversized description rejected', $$select public.edit_own_review(current_setting('c.post')::uuid,1,'Valid place','Comer',repeat('a',1501))$$,'INVALID_DETAILS');
+select pg_temp.c_denied('direct row update denied', $$update public.posts set user_id=auth.uid() where id=current_setting('c.post')::uuid$$,'permission denied');
+select pg_temp.c_denied('direct row deletion denied', $$delete from public.posts where id=current_setting('c.post')::uuid$$,'permission denied');
+select pg_temp.c_denied('private tombstones denied', $$select * from public.content_deletions$$,'permission denied');
+select pg_temp.c_check('no file deletion permission before confirmation',not public.own_content_file_deleting(auth.uid()::text||'/post.png'));
+select pg_temp.c_denied('missing confirmation rejected', $$select public.content_management('begin','post',current_setting('c.post')::uuid,'NO')$$,'CONFIRMATION_REQUIRED');
+select pg_temp.c_denied('invalid kind rejected', $$select public.content_management('begin','profile',current_setting('c.post')::uuid,'ELIMINAR')$$,'INVALID_ACTION');
+reset role;
+-- A moderation hold remains effective even when the author tries editing.
+insert into public.moderation_holds(target_kind,target_id,updated_by) values('post',current_setting('c.post')::uuid,current_setting('c.b')::uuid);
+set local role authenticated;
+select pg_temp.c_denied('moderated review cannot evade hold by editing', $$select public.edit_own_review(current_setting('c.post')::uuid,1,'New place','Comer','')$$,'EDIT_BLOCKED');
+reset role;
+update public.moderation_holds set active=false where target_id=current_setting('c.post')::uuid;
+select set_config('request.jwt.claim.sub',current_setting('c.b'),true),set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('c.b'),'session_id',current_setting('c.sb'))::text,true);
+set local role authenticated;
+select pg_temp.c_denied('other account cannot edit', $$select public.edit_own_review(current_setting('c.post')::uuid,1,'Foreign change','Comer','')$$,'CONTENT_UNAVAILABLE');
+select pg_temp.c_denied('other account cannot remove', $$select public.content_management('begin','post',current_setting('c.post')::uuid,'ELIMINAR')$$,'CONTENT_UNAVAILABLE');
+insert into public.comments(id,user_id,post_id,author_name,body) values(current_setting('c.comment')::uuid,auth.uid(),current_setting('c.post')::uuid,'ignored','Synthetic comment');
+insert into public.post_likes(user_id,post_id) values(auth.uid(),current_setting('c.post')::uuid);
+insert into public.bookmarks(user_id,post_id) values(auth.uid(),current_setting('c.post')::uuid);
+insert into public.content_reports(reporter_id,target_kind,target_id,reason) values(auth.uid(),'post',current_setting('c.post')::uuid,'Otro');
+reset role;
+insert into public.moderation_holds(target_kind,target_id,updated_by,active) values('comment',current_setting('c.comment')::uuid,current_setting('c.a')::uuid,false);
+select set_config('request.jwt.claim.sub',current_setting('c.a'),true),set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('c.a'),'session_id',current_setting('c.sa'))::text,true);
+set local role authenticated;
+select pg_temp.c_check('begin withdraws and returns own file',public.content_management('begin','post',current_setting('c.post')::uuid,'ELIMINAR')->>'file'=auth.uid()::text||'/post.png');
+select pg_temp.c_check('repeat begin is idempotent',public.content_management('begin','post',current_setting('c.post')::uuid,'ELIMINAR')->>'pending'='true');
+select pg_temp.c_check('owner sees own pending removal',jsonb_array_length(public.content_management('pending')->'items')=1);
+select pg_temp.c_check('removed post and comments hidden',not exists(select 1 from public.posts where id=current_setting('c.post')::uuid) and not exists(select 1 from public.comments where post_id=current_setting('c.post')::uuid));
+select pg_temp.c_check('aggregate counts hidden',not exists(select 1 from public.post_stats where post_id=current_setting('c.post')::uuid));
+select pg_temp.c_check('related notifications hidden',not exists(select 1 from public.notifications where post_id=current_setting('c.post')::uuid));
+select pg_temp.c_check('only withdrawn own file may be deleted',public.own_content_file_deleting(auth.uid()::text||'/post.png') and not public.own_content_file_deleting(auth.uid()::text||'/story.png'));
+select pg_temp.c_denied('finish waits for real Storage absence', $$select public.content_management('finish','post',current_setting('c.post')::uuid,'ELIMINAR')$$,'FILES_REMAIN');
+select pg_temp.c_denied('withdrawn review cannot be edited', $$select public.edit_own_review(current_setting('c.post')::uuid,1,'Hidden change','Comer','')$$,'CONTENT_UNAVAILABLE');
+select pg_temp.c_denied('withdrawn upload path cannot be reused', $$insert into storage.objects(bucket_id,name) values('review-media',auth.uid()::text||'/post.png')$$,'row-level security');
+reset role;
+select set_config('request.jwt.claim.sub',current_setting('c.b'),true),set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('c.b'),'session_id',current_setting('c.sb'))::text,true);
+set local role authenticated;
+select pg_temp.c_check('other account cannot see pending markers or file permission',jsonb_array_length(public.content_management('pending')->'items')=0 and not public.own_content_file_deleting(current_setting('c.a')||'/post.png'));
+set local role anon;
+select pg_temp.c_check('withdrawal hides content from guests',not exists(select 1 from public.posts where id=current_setting('c.post')::uuid) and not exists(select 1 from public.comments where post_id=current_setting('c.post')::uuid));
+select pg_temp.c_denied('guest edit RPC denied', $$select public.edit_own_review(current_setting('c.post')::uuid,1,'Guest place','Comer','')$$,'permission denied');
+select pg_temp.c_denied('guest deletion RPC denied', $$select public.content_management('begin','post',current_setting('c.post')::uuid,'ELIMINAR')$$,'permission denied');
+reset role;
+-- Rename synthetic metadata inside ROLLBACK to model absent Storage. This is NOT
+-- a binary deletion test and does not bypass Storage's protected DELETE trigger.
+update storage.objects set name=current_setting('c.a')||'/retired-fixture.png' where name=current_setting('c.a')||'/post.png' and bucket_id='review-media';
+select set_config('request.jwt.claim.sub',current_setting('c.a'),true),set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('c.a'),'session_id',current_setting('c.sa'))::text,true);
+set local role authenticated;
+select pg_temp.c_check('finish succeeds after file absence',public.content_management('finish','post',current_setting('c.post')::uuid,'ELIMINAR')->>'deleted'='true');
+select pg_temp.c_check('lost finish response may be retried',public.content_management('finish','post',current_setting('c.post')::uuid,'ELIMINAR')->>'deleted'='true');
+select pg_temp.c_check('finished deletion leaves pending list',jsonb_array_length(public.content_management('pending')->'items')=0);
+select pg_temp.c_denied('deleted id cannot resurrect with another file', $$insert into public.posts(id,user_id,author_name,category,place,kind,media_path) values(current_setting('c.post')::uuid,auth.uid(),'ignored','Comer','Back again','image',auth.uid()::text||'/story.png')$$,'row-level security');
+select pg_temp.c_check('story withdrawal begins separately',public.content_management('begin','story',current_setting('c.story')::uuid,'ELIMINAR')->>'pending'='true');
+select pg_temp.c_check('withdrawn story is hidden on subsequent reads',not exists(select 1 from public.stories where id=current_setting('c.story')::uuid));
+reset role;
+select pg_temp.c_check('review data and cascades removed',not exists(select 1 from public.posts where id=current_setting('c.post')::uuid) and not exists(select 1 from public.comments where post_id=current_setting('c.post')::uuid) and not exists(select 1 from public.post_likes where post_id=current_setting('c.post')::uuid) and not exists(select 1 from public.bookmarks where post_id=current_setting('c.post')::uuid) and not exists(select 1 from public.notifications where post_id=current_setting('c.post')::uuid));
+select pg_temp.c_check('moderation references removed',not exists(select 1 from public.content_reports where target_id=current_setting('c.post')::uuid) and not exists(select 1 from public.moderation_holds where target_id in(current_setting('c.post')::uuid,current_setting('c.comment')::uuid)));
+select pg_temp.c_check('real posts preserved',not exists(select 1 from real_content_baseline b where b.total<>(select count(*) from public.posts p where p.user_id=b.user_id)));
+insert into public.account_deletions(user_id) values(current_setting('c.a')::uuid);
+set local role authenticated;
+select pg_temp.c_denied('deleting account cannot mutate content', $$select public.content_management('pending')$$,'ACCOUNT_UNAVAILABLE');
+select pg_temp.c_check('new file removal permission excludes frozen accounts',not public.own_content_file_deleting(auth.uid()::text||'/story.png'));
+reset role;
+delete from public.account_deletions where user_id=current_setting('c.a')::uuid;
+delete from auth.sessions where id=current_setting('c.sa')::uuid;
+set local role authenticated;
+select pg_temp.c_check('revoked owner session loses file removal permission',not public.own_content_file_deleting(auth.uid()::text||'/story.png'));
+select pg_temp.c_denied('revoked owner cannot resume pending deletion', $$select public.content_management('begin','story',current_setting('c.story')::uuid,'ELIMINAR')$$,'SIGN_IN_REQUIRED');
+reset role;
+delete from auth.sessions where id=current_setting('c.sb')::uuid;
+select set_config('request.jwt.claim.sub',current_setting('c.b'),true),set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('c.b'),'session_id',current_setting('c.sb'))::text,true);
+set local role authenticated;
+select pg_temp.c_denied('revoked session rejected', $$select public.content_management('pending')$$,'SIGN_IN_REQUIRED');
+reset role;
+select count(*) as checks,count(*) filter(where passed) as passed,coalesce(jsonb_agg(check_name) filter(where not passed),'[]'::jsonb) as failures from content_results;
+rollback;
