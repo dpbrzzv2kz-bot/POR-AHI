@@ -6,12 +6,12 @@ import {Buffer} from 'node:buffer';
 // Code-native provisional mark: the arrow already used beside the app's name.
 const target=fileURLToPath(new URL('../public/icons/',import.meta.url));
 await mkdir(target,{recursive:true});
-await writeFile(`${target}/icon.svg`,'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="#243d31" d="M0 0h512v512H0z"/><path d="M176 336 336 176M176 176h160v160" fill="none" stroke="#f9f7ef" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/></svg>\n');
+await writeFile(`${target}/icon.svg`,'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="#17171C" d="M0 0h512v512H0z"/><path d="M176 336 336 176M176 176h160v160" fill="none" stroke="#D4FF38" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/></svg>\n');
 function crc32(bytes){let value=0xffffffff;for(const byte of bytes){value^=byte;for(let i=0;i<8;i++)value=(value>>>1)^((value&1)?0xedb88320:0);}return(value^0xffffffff)>>>0;}
 function chunk(name,data){const type=Buffer.from(name),length=Buffer.alloc(4),crc=Buffer.alloc(4);length.writeUInt32BE(data.length);crc.writeUInt32BE(crc32(Buffer.concat([type,data])));return Buffer.concat([length,type,data,crc]);}
 function distance(x,y,a,b,c,d){const t=Math.max(0,Math.min(1,((x-a)*(c-a)+(y-b)*(d-b))/((c-a)**2+(d-b)**2)));return Math.hypot(x-a-t*(c-a),y-b-t*(d-b));}
 function png(size){
-  const pixels=Buffer.alloc((size*3+1)*size),bg=[36,61,49],fg=[249,247,239];
+  const pixels=Buffer.alloc((size*3+1)*size),bg=[23,23,28],fg=[212,255,56];
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     let ink=0;
     for(const dy of [.25,.75])for(const dx of [.25,.75]){

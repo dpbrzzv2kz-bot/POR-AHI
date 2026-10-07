@@ -1,0 +1,21 @@
+import {cp,mkdir,readFile,writeFile,stat} from 'node:fs/promises';
+import {resolve,sep} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const app=fileURLToPath(new URL('../',import.meta.url)),workspace=resolve(app,'../..');
+const source=resolve(workspace,'work/urban-design-web'),target=resolve(workspace,'work/urban-design-preview');
+if(!target.startsWith(workspace+sep))throw Error('Release must stay in workspace');
+const html=await readFile(resolve(source,'index.html'),'utf8');
+const entry=html.match(/src="([^"]+entry-[^"]+\.js)"/)?.[1];
+if(!entry||!html.includes('manifest.webmanifest')||!html.includes('apple-touch-icon')||!html.includes('lang="es"')||!html.includes('Por Ahí'))throw Error('Mobile web metadata missing');
+const bundle=await readFile(resolve(source,'.'+entry),'utf8');
+for(const marker of ['edit_own_review','content_management','Compartir enlace','Copiar enlace','Una recomendaci','/?review=','Hoy se sale.','Buscar rese','Ver m','#D4FF38','Dale play al plan.'])if(!bundle.includes(marker))throw Error('Feature missing: '+marker);
+if(!bundle.includes('https://bxsllqteuafbusruspqd.supabase.co')||bundle.includes('http://127.0.0.1:8797'))throw Error('Wrong production endpoint');
+try{await stat(target);throw Error('Use a fresh release directory; do not mix exports');}catch(e){if(e.code!=='ENOENT')throw e;}
+await mkdir(target,{recursive:true});
+const excluded=['privacy','terms'].map(name=>resolve(source,name));
+await cp(source,target,{recursive:true,filter:path=>!excluded.some(p=>path===p||path.startsWith(p+sep))});
+for(const name of ['_headers','_redirects'])await cp(resolve(app,'web-preview',name),resolve(target,name));
+const headers=await readFile(resolve(target,'_headers'),'utf8');
+await writeFile(resolve(target,'_headers'),headers+'\n/manifest.webmanifest\n  Cache-Control: no-cache\n');
+await writeFile(resolve(workspace,'work/urban-design-package-check.json'),JSON.stringify({entry,target,legalDraftsExcluded:true,databaseChanges:false,published:false},null,2));
+console.log('Urban design preview prepared; original database permissions preserved');
