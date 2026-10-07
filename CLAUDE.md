@@ -48,6 +48,8 @@
 
 > **Aviso (2026-10-07):** las líneas anteriores de este archivo decían que likes, mensajes, stories y búsqueda eran maqueta. La auditoría de Claude encontró que ya están implementados (ver `supabase/` y `README.md`). Los detalles de la web publicada (datos ficticios, "Actualizando…", íconos de texto) venían de una revisión anterior y **hay que reverificarlos** contra la versión actual.
 
+Entornos: `.env` = producción, `.env.local` = pruebas (tiene prioridad). Guía en `docs/ENTORNOS.md`. **Antes de publicar, confirmar que `.env.local` no existe.** El Supabase de pruebas aún no está creado.
+
 Limitación del equipo: Windows bloquea `node.exe` por directiva de grupo en las sesiones de Claude, por lo que `tsc`, `lint` y las pruebas no se han podido correr desde aquí.
 
 ## 4. Decisiones ya tomadas
