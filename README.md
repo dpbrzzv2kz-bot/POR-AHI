@@ -226,7 +226,7 @@ Queda pendiente un recorrido autenticado entre dos cuentas reales sobre la web p
 
 ## Privacidad y eliminación de cuenta: servidor activado, pantallas pendientes (2026-10-07)
 
-Tras la autorización expresa del propietario, **011 está aplicada en Supabase POR AHI** (`bxsllqteuafbusruspqd`). Las pantallas y los textos nuevos están preparados localmente; **no se ha publicado otro deploy en Netlify**. No se ha eliminado ninguna cuenta real. La configuración de Google sigue igual.
+Tras la autorización expresa del propietario, **011 está aplicada en Supabase POR AHI** (`bxsllqteuafbusruspqd`). Las pantallas y los textos nuevos están preparados localmente; **no se han publicado las pantallas de privacidad/eliminación**. La mejora técnica de acceso web en iPhone se publicó por separado, como se documenta abajo. No se ha eliminado ninguna cuenta real. La configuración de Google sigue igual.
 
 Las rutas `/privacy`, `/terms` y `/delete-account` están enlazadas desde la cuenta, incluido el formulario de acceso. Los textos compartidos viven en `lib/legalContent.ts`; las páginas se leen sin iniciar sesión. `tests/buildLegalPages.mts` también genera HTML en `public/privacy/index.html` y `public/terms/index.html` para enlaces directos y lectores sin JavaScript. Las condiciones proponen una beta inicial de mayores de 18 años y requieren revisión del responsable; no se ha añadido verificación de edad ni un registro de aceptación de condiciones.
 
@@ -259,3 +259,29 @@ La prueba SQL no valida la retirada de binarios por Storage real: comprueba el m
 Para reproducir la vista local: `BETA_DELETE_FAILURE=1 node tests/betaFixture.mjs . web-privacy-preview` (establecer la variable según el shell). El tercer argumento selecciona la exportación preparada; se sustituyen y verifican los destinos y claves de producción antes de servirla. El fallo simulado afecta la primera retirada de archivos de Beta Carla y se recupera al reintentar. Reiniciar el servidor restaura los datos ficticios. La traza de esta pasada registró el evento final como visitor porque se emitía después de retirar el perfil; se movió ese registro antes de retirarlo para futuras pasadas, sin alterar el flujo de la app.
 
 Antes de generar un paquete publicable: completar y revisar `legalOperator`, ejecutar `node --experimental-strip-types tests/buildLegalPages.mts --publish`, exportar con Expo y revisar las páginas y enlaces directos. El parámetro `--publish` rechaza un responsable incompleto. **011 ya está aplicada en POR AHI: no volver a ejecutarla allí.** La publicación del paquete real sigue pendiente; **no publicar las copias del fixture**. Los textos y páginas nuevos no crean dominios, suscripciones ni servicios de pago.
+
+## Avance para iPhone y acceso desde Inicio (2026-10-07)
+
+El propietario pidió posponer los datos legales y las cuentas adicionales de prueba y continuar con el desarrollo. No completar `legalOperator` con datos inferidos ni insistir en esos datos para realizar mejoras técnicas independientes. La eliminación con binarios reales y la publicación de las pantallas legales siguen pendientes.
+
+### Base nativa
+
+Se corrigió AsyncStorage de 3.1.1 a **2.2.0**, la versión incluida en Expo Go para SDK 57. Se ajustaron las actualizaciones compatibles de Expo a 57.0.27, Constants a 57.0.21 instalada, Linking a 57.0.12 y Router a 57.0.25. `expo install --check` informa Dependencies are up to date. Referencia: https://docs.expo.dev/versions/v57.0.0/sdk/async-storage/.
+
+`app.json` muestra Por Ahí y usa un icono provisional de la flecha existente. El plugin de ImagePicker describe en español el uso de las fotos/videos elegidos. La función actual selecciona archivos de la galería: cámara/micrófono están deshabilitados en esa configuración. Cambiar esos mensajes requiere una compilación nativa; Expo Go usa sus propios permisos. El icono SVG y sus PNG de 180/192/512 px se reproducen con `node scripts/buildWebIcons.mjs`.
+
+La sesión de Expo existente se recuperó al usar el directorio de configuración que ya estaba dentro de `../../work/expo-home`; no fue necesario crear otra cuenta. No guardar ni imprimir las credenciales de ese directorio. En la ejecución restringida se usa el ajuste de CLI `__UNSAFE_EXPO_HOME_DIRECTORY` solo desde el shell para conservar la configuración en el workspace; no colocarlo en `.env`.
+
+Se exportó el JavaScript de iOS con 1249 módulos, `--no-bytecode`, en `../../work/resenas-ios-oct07`. Esto es un diagnóstico de resolución/bundling, **no una app firmada ni una prueba de arranque en iPhone**. El inicio con `--go --tunnel` falla con spawn EPERM al ejecutar ngrok, incluso fuera de la ejecución restringida. No se modificó el firewall, no se desactivaron protecciones del equipo y no hay un túnel activo. El acceso Google nativo y la prueba física siguen pendientes. Comandos disponibles: `npm run check:expo`, `npm run check:ios-js` y `npm run iphone` (este último necesita que el equipo permita el programa de conexión). Documentación: https://docs.expo.dev/more/expo-cli/.
+
+### Web en la pantalla de inicio
+
+Se publicó un manifiesto de instalación, iconos y metadatos para Safari, y la guía **https://incredible-crumble-34cbca.netlify.app/install/**. En el iPhone: abrir la raíz de Por Ahí en Safari → Compartir → Añadir a pantalla de inicio → mantener Abrir como app web si aparece → Añadir. La instalación y el acceso desde Inicio aún requieren comprobarse en el iPhone físico. Referencias: https://docs.expo.dev/guides/progressive-web-apps/ y https://support.apple.com/guide/iphone/bookmark-a-website-iph42ab2f3a7/ios.
+
+Esta versión necesita internet; no se añadió un service worker ni se promete uso sin conexión. Safari y el acceso desde Inicio pueden conservar sesiones distintas; el flujo Google en ese modo también necesita validación física. `public/index.html` y `public/manifest.webmanifest` preparan los metadatos para futuras exportaciones web.
+
+La publicación técnica usa `scripts/buildMobileWebOverlay.mjs` sobre la exportación ya publicada de Google en `web-preview`: exige el bundle conocido, rechaza las pantallas legales pendientes y comprueba que el JavaScript conserve el mismo SHA-256. El resultado está en `../../work/por-ahi-mobile-web`; el ZIP contiene todos sus recursos, incluidos assets. **No se publicó una nueva exportación de las pantallas legales.**
+
+Netlify confirmó el deploy **6ac6a0cc3c2a6870c7300fbb** publicado el 7 de octubre; el JavaScript público continúa siendo `entry-dddfa0887deae8892dc752c39a17287d.js`. Paquete: `../por-ahi-iphone-web.zip` (467354 bytes). Se verificaron en la web pública la guía y su icono cargado, título Por Ahí, idioma es, manifiesto, icono de Apple, metadato standalone y el mismo bundle. El enlace de la guía abre la aplicación. Evidencia: `../por-ahi-iphone-publicado.png`; comprobación de paquete: `../../work/mobile-web-package-check.json`.
+
+TypeScript pasa y las **32 pruebas de acceso Google, recuperación, cargas y eliminación pasan**, sin cuentas reales nuevas. ESLint: 0 errores, 30 advertencias previas; los scripts nuevos no tienen diagnósticos. El panel de Netlify mostró 89 créditos restantes tras esta publicación: agrupar futuras mejoras para evitar despliegues repetidos y conservar el plan actual, sin activar pagos o mejoras de plan.

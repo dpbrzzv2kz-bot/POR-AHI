@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "resenas-app",
+    "name": "Por Ahí",
     "slug": "resenas-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./public/icons/icon-512.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
@@ -20,11 +20,20 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
+      "lang": "es",
       "bundler": "metro",
       "output": "single"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Por Ahí usa las fotos y videos que elijas para publicar tus reseñas y stories.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "porahi"
   }
