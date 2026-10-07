@@ -1,6 +1,7 @@
 import {supabase} from './supabase';
 import {prepareMedia, mediaSource, mediaExtension} from './media';
 import {uploadInChunks, checkSignal, waitForOperation, type UploadProgress} from './resumable';
+import {hydrateReviews} from './reviewMedia';
 
 export type Media={uri:string;type:'image'|'video';mimeType?:string;fileName?:string;file?:File;size?:number;duration?:number};
 export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number};
@@ -18,11 +19,7 @@ export async function loadPosts(filter?:{userId?:string;userIds?:string[];postId
  if(signal)request=request.abortSignal(signal);
  const {data,error}=await request;
  if(error)throw new Error('No se pudieron cargar las publicaciones. Pulsa Actualizar.');
- if(!data?.length)return [];
- const signed=await waitForOperation(supabase.storage.from(bucket).createSignedUrls(data.map(r=>r.media_path),3600),signal);
- if(signed.error)throw new Error('No se pudieron cargar las fotos y videos. Pulsa Actualizar.');
- const urls=new Map(signed.data?.map(r=>[r.path,r.signedUrl]));
- return data.map(r=>{const uri=urls.get(r.media_path);if(!uri)throw new Error('Algún archivo no pudo cargarse. Pulsa Actualizar.');return {id:r.id,userId:r.user_id,author:r.author_name,category:r.category,place:r.place,text:r.description,version:r.edit_version,kind:r.kind,media:{uri,type:r.kind},cloud:true,color:'#2b3933',symbol:'↗'};});
+ return hydrateReviews(supabase,data||[],signal);
 }
 export async function loadStories():Promise<Story[]>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');

@@ -33,6 +33,7 @@ if(process.env.BETA_OWN_CONTENT==='1'){
 }
 let failDeletionOnce=process.env.BETA_DELETE_FAILURE==='1';
 let sharedReviewFailures=process.env.BETA_SHARING_FAILURE==='1'?4:0;
+let discoveryFailures=process.env.BETA_DISCOVERY==='1'?4:0;
 if(process.env.BETA_SHARING==='1'){
  const png=await readFile(resolve(app,'public/icons/icon-512.png'));
  // Put Ana's seeded review beyond the newest 60 to exercise lookup by ID.
@@ -43,6 +44,10 @@ if(process.env.BETA_SHARING==='1'){
  const path=`${profiles[0].id}/sharing-video.mp4`,video=await readFile(resolve(app,'../../work/media-fixtures/video-base.mp4'));
  files.set(path,{bytes:video,mime:'video/mp4'});
  data.posts.push({id:randomUUID(),user_id:profiles[0].id,author_name:profiles[0].display_name,place:'Video de prueba para compartir',category:'Divertirse',description:'Video ficticio reproducible por enlace.',kind:'video',media_path:path,edit_version:0,created_at:now()});
+}
+if(process.env.BETA_DISCOVERY==='1'){
+ const path=`${profiles[0].id}/discovery-special.png`,png=await readFile(resolve(app,'public/icons/icon-512.png'));files.set(path,{bytes:png,mime:'image/png'});
+ for(const place of ['Café 100%_Real','Lugar fallo recuperado','Lugar Lento'])data.posts.push({id:randomUUID(),user_id:profiles[0].id,author_name:profiles[0].display_name,place,category:'Comer',description:'Reseña ficticia para comprobar búsqueda literal y recuperación.',kind:'image',media_path:path,edit_version:0,created_at:now()});
 }
 if(failDeletionOnce)files.set(`${profiles[2].id}/delete-test.png`,{bytes:Buffer.from('Synthetic local file'),mime:'image/png'});
 let failMessageOnce=true;
@@ -76,6 +81,7 @@ const notice=(recipient,actor,kind,post=null,comment=null)=>{
 const filter=(rows,url)=>rows.filter(row=>[...url.searchParams].every(([key,value])=>{
  if(['select','order','limit','offset','on_conflict','or'].includes(key))return true;
  if(value.startsWith('eq.'))return String(row[key])===value.slice(3);
+ if(value.startsWith('ilike.')){const pattern=value.slice(6),literal=pattern.slice(1,-1).replace(/\\([\\%_])/g,'$1');return String(row[key]).toLowerCase().includes(literal.toLowerCase());}
  if(value.startsWith('in.'))return value.slice(4,-1).split(',').includes(String(row[key]));
  if(value==='is.null')return row[key]==null;return true;
 }));
@@ -161,6 +167,11 @@ async function handle(req,res,port){try{
  if(path.startsWith('/rest/v1/rpc/')){await bytes(req);reply(res,path.endsWith('is_moderator')?false:[]);return;}
  if(path.startsWith('/rest/v1/')){
   const table=path.split('/').at(-1);
+  if(table==='posts'&&req.method==='GET'&&url.searchParams.has('offset')){
+   event('discovery_query',uid,{place:url.searchParams.get('place')||'',category:url.searchParams.get('category')||'',format:url.searchParams.get('kind')||'',offset:url.searchParams.get('offset'),limit:url.searchParams.get('limit')});
+   if(url.searchParams.get('place')?.includes('fallo')&&discoveryFailures>0){discoveryFailures--;reply(res,{message:'Synthetic search failure'},503);return;}
+   if(url.searchParams.get('place')?.includes('Lento'))await new Promise(resolve=>setTimeout(resolve,5000));
+  }
   if(table==='posts'&&req.method==='GET'&&url.searchParams.get('id')?.startsWith('in.')&&sharedReviewFailures>0){sharedReviewFailures--;event('simulated_shared_review_failure',uid);reply(res,{message:'Synthetic temporary failure'},503);return;}
   if(!['GET','HEAD'].includes(req.method)){
    if(!uid){reply(res,{code:'42501',message:'Local session required'},403);return;}
@@ -200,8 +211,8 @@ async function handle(req,res,port){try{
   let rows=filter(tableRows(table,uid),url);
   if(table==='public_profiles'&&url.searchParams.has('or')){const query=url.searchParams.get('or').match(/ilike\.%([^%]+)%/)?.[1]?.replace(/\\_/g,'_').toLowerCase() || '';rows=rows.filter(p=>`${p.username} ${p.display_name}`.toLowerCase().includes(query));}
   if(['posts','stories','notifications','comments','messages'].includes(table))rows=[...rows].reverse();
-  const total=rows.length;rows=rows.slice(0,Number(url.searchParams.get('limit')||total));
-  const headers={'Content-Range':`0-${Math.max(0,rows.length-1)}/${total}`};
+  const total=rows.length,start=Number(url.searchParams.get('offset')||0);rows=rows.slice(start,start+Number(url.searchParams.get('limit')||total));
+  const headers={'Content-Range':`${start}-${Math.max(start,start+rows.length-1)}/${total}`};
   if(req.method==='HEAD'){res.writeHead(200,headers).end();return;}
   reply(res,req.headers.accept?.includes('vnd.pgrst.object')?rows[0]||null:rows,req.method==='POST'?201:200,headers);return;
  }
