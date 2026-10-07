@@ -5,7 +5,7 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/**", "web-preview/**"],
+    ignores: ["dist/**", "web-preview/**", "web-privacy-preview/**"],
   },
   {
     // Existing screen uses effect-driven request state and event-handler factories.

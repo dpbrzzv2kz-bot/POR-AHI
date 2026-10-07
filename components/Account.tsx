@@ -2,7 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {View,Text,TextInput,Pressable,StyleSheet,Platform} from 'react-native';
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
-import {router} from 'expo-router';
+import {Link,router} from 'expo-router';
 import {googleSignInEnabled,startGoogleSignIn} from '../lib/googleSignIn';
 import {createAuthFetch} from '../lib/authFetch';
 
@@ -92,6 +92,7 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  {button(profileLoading?'Cargando perfil…':busy?'Guardando…':'Guardar perfil',save,profileLoading)}
  {!profileReady&&!profileLoading&&button('Reintentar carga',()=>setLoadAttempt(n=>n+1))}
  {button('Cerrar sesión',async()=>{setBusy(true);try{const {error}=await supabase!.auth.signOut();if(error)setNotice('No se pudo cerrar la sesión. Intenta de nuevo.');}catch{setNotice('No hay conexión.');}finally{setBusy(false);}})}
+ <Link href="/delete-account" style={styles.legal}>Eliminar cuenta</Link>
  </>:<><Text style={styles.note}>Puedes explorar sin cuenta. Regístrate para guardar tu perfil.</Text>
  {googleEnabled&&<><Pressable accessibilityRole="button" disabled={busy} onPress={google} style={[googleStyles.button,busy&&{opacity:.5}]}><Text style={googleStyles.text}>Continuar con Google</Text></Pressable><Text style={styles.note}>Usa la misma cuenta de Google cada vez. Si ya tienes una cuenta aquí, utiliza el mismo correo para conservar tu perfil.</Text><Text style={styles.label}>O entra con tu correo</Text></>}
  {googleRetry&&button('Reintentar opciones de acceso',()=>setProviderAttempt(n=>n+1))}
@@ -101,9 +102,10 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  {!signup&&button('Olvidé mi contraseña',()=>{setPassword('');router.push('/forgot-password');})}
  {button(signup?'Ya tengo cuenta':'Quiero registrarme',()=>{setSignup(!signup);setNotice('');setPassword('');})}</>}
  {!session&&!!notice&&<Text accessibilityRole="alert" style={styles.note}>{notice}</Text>}
+ <Text style={styles.note}>Consulta cómo se usa tu información y las reglas de esta beta.</Text><Link href="/privacy" style={styles.legal}>Aviso de privacidad</Link><Link href="/terms" style={styles.legal}>Condiciones de la beta</Link>
  </View>;
 }
-const styles=StyleSheet.create({feedback:{fontSize:14,lineHeight:22,color:'#243d31',fontWeight:'600',padding:12,backgroundColor:'#fff',borderRadius:10,marginTop:12},box:{padding:18,borderRadius:18,backgroundColor:'#eef1e8',marginBottom:18},title:{fontSize:23,fontWeight:'700',color:'#243d31'},note:{fontSize:13,lineHeight:21,color:'#536350',marginVertical:10},label:{fontSize:13,color:'#334b3b',marginTop:14,marginBottom:8},input:{backgroundColor:'#fff',padding:14,borderRadius:12,color:'#243d31',fontSize:15},button:{backgroundColor:'#965337',borderRadius:12,padding:15,marginTop:12,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'600'}});
+const styles=StyleSheet.create({legal:{fontSize:14,color:'#965337',textDecorationLine:'underline',marginTop:14},feedback:{fontSize:14,lineHeight:22,color:'#243d31',fontWeight:'600',padding:12,backgroundColor:'#fff',borderRadius:10,marginTop:12},box:{padding:18,borderRadius:18,backgroundColor:'#eef1e8',marginBottom:18},title:{fontSize:23,fontWeight:'700',color:'#243d31'},note:{fontSize:13,lineHeight:21,color:'#536350',marginVertical:10},label:{fontSize:13,color:'#334b3b',marginTop:14,marginBottom:8},input:{backgroundColor:'#fff',padding:14,borderRadius:12,color:'#243d31',fontSize:15},button:{backgroundColor:'#965337',borderRadius:12,padding:15,marginTop:12,alignItems:'center'},buttonText:{color:'#fff',fontWeight:'600'}});
 
 
 

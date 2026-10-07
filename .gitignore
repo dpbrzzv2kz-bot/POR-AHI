@@ -42,3 +42,4 @@ yarn-error.*
 /ios
 /android
 web-preview/
+web-privacy-preview/

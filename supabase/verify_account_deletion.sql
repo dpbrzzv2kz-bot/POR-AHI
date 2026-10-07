@@ -1,0 +1,106 @@
+-- Apply 011 inside this same transaction for preview, and end in ROLLBACK.
+-- Synthetic identities have no passwords, emails delivered, or binary uploads.
+begin;
+create temporary table deletion_results(check_name text,passed boolean);
+grant select,insert on deletion_results to authenticated,anon;
+create function pg_temp.d_check(label text,ok boolean) returns void language sql as $$
+ insert into deletion_results values(label,coalesce(ok,false));$$;
+create function pg_temp.d_denied(label text,query text,expected text) returns void language plpgsql as $$
+begin
+ begin execute query;perform pg_temp.d_check(label,false);
+ exception when others then perform pg_temp.d_check(label,position(expected in sqlerrm)>0);end;
+end $$;
+grant execute on function pg_temp.d_check(text,boolean),pg_temp.d_denied(text,text,text) to authenticated,anon;
+select set_config('d.a',gen_random_uuid()::text,true),set_config('d.b',gen_random_uuid()::text,true),set_config('d.c',gen_random_uuid()::text,true),set_config('d.sa',gen_random_uuid()::text,true),set_config('d.sb',gen_random_uuid()::text,true),set_config('d.post',gen_random_uuid()::text,true);
+insert into auth.users(id,aud,role,email) select current_setting('d.'||x)::uuid,'authenticated','authenticated','deletion-test-'||current_setting('d.'||x)||'@example.invalid' from unnest(array['a','b','c'])x;
+insert into auth.sessions(id,user_id,created_at) values(current_setting('d.sa')::uuid,current_setting('d.a')::uuid,now()),(current_setting('d.sb')::uuid,current_setting('d.b')::uuid,now());
+insert into public.profiles(id,display_name,username) select current_setting('d.'||x)::uuid,'Deletion test '||x,'del_'||substr(replace(current_setting('d.'||x),'-',''),1,16) from unnest(array['a','b','c'])x;
+insert into storage.objects(bucket_id,name,owner,owner_id,metadata) values('review-media',current_setting('d.a')||'/test.png',current_setting('d.a')::uuid,current_setting('d.a'),'{"size":100,"mimetype":"image/png"}');
+select set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('d.a'),'session_id',current_setting('d.sa'),'amr',jsonb_build_array(jsonb_build_object('method','password','timestamp',extract(epoch from now())::bigint)))::text,true);
+select set_config('request.jwt.claim.sub',current_setting('d.a'),true);
+set local role authenticated;
+select pg_temp.d_check('fresh account not pending',public.account_deletion('status')->>'pending'='false');
+select pg_temp.d_denied('confirmation required', $$select public.account_deletion('begin','NO')$$,'CONFIRMATION_REQUIRED');
+select pg_temp.d_denied('unknown action denied', $$select public.account_deletion('other','ELIMINAR')$$,'INVALID_ACTION');
+select pg_temp.d_denied('private deletion table denied', $$select * from public.account_deletions$$,'permission denied');
+insert into public.posts(id,user_id,author_name,category,place,kind,media_path) values(current_setting('d.post')::uuid,auth.uid(),'ignored','Comer','Test place','image',current_setting('d.a')||'/test.png');
+select pg_temp.d_check('own upload before deletion works',exists(select 1 from public.posts where id=current_setting('d.post')::uuid));
+select pg_temp.d_check('no Storage delete authorization before begin',not public.own_account_deleting());
+select set_config('request.jwt.claims',jsonb_set(auth.jwt(),'{amr}',jsonb_build_array(jsonb_build_object('method','token_refresh','timestamp',extract(epoch from now())::bigint)))::text,true);
+select pg_temp.d_denied('refresh alone cannot authorize deletion', $$select public.account_deletion('begin','ELIMINAR')$$,'RECENT_SIGN_IN_REQUIRED');
+select set_config('request.jwt.claims',jsonb_set(auth.jwt(),'{amr}',jsonb_build_array(jsonb_build_object('method','oauth','timestamp',extract(epoch from now())::bigint-601)))::text,true);
+select pg_temp.d_denied('old login denied', $$select public.account_deletion('begin','ELIMINAR')$$,'RECENT_SIGN_IN_REQUIRED');
+select set_config('request.jwt.claims',jsonb_set(auth.jwt(),'{amr}',jsonb_build_array(jsonb_build_object('method','oauth','timestamp',extract(epoch from now())::bigint)))::text,true);
+select public.account_deletion('begin','ELIMINAR');
+select pg_temp.d_check('begin creates pending state',public.account_deletion('status')->>'pending'='true');
+select pg_temp.d_check('begin is idempotent',public.account_deletion('begin','ELIMINAR')->>'pending'='true');
+select pg_temp.d_check('manifest contains only own file',public.account_deletion('files','ELIMINAR')->'files'=jsonb_build_array(current_setting('d.a')||'/test.png'));
+select pg_temp.d_denied('finish denied until files removed', $$select public.account_deletion('finish','ELIMINAR')$$,'FILES_REMAIN');
+select pg_temp.d_denied('frozen profile cannot update', $$update public.profiles set bio='cannot change' where id=auth.uid()$$,'ACCOUNT_UNAVAILABLE');
+select pg_temp.d_denied('frozen account cannot upload', $$insert into storage.objects(bucket_id,name) values('review-media',auth.uid()::text||'/new.png')$$,'row-level security');
+reset role;
+select set_config('request.jwt.claim.sub',current_setting('d.b'),true);
+select set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('d.b'),'session_id',current_setting('d.sb'),'amr',jsonb_build_array(jsonb_build_object('method','password','timestamp',extract(epoch from now())::bigint)))::text,true);
+-- Conversations/messages and reviewed reports exercise the existing FK cascades.
+insert into public.conversations(id,user_low,user_high) values(gen_random_uuid(),least(current_setting('d.a')::uuid,current_setting('d.b')::uuid),greatest(current_setting('d.a')::uuid,current_setting('d.b')::uuid));
+insert into public.messages(id,conversation_id,sender_id,body) select gen_random_uuid(),id,current_setting('d.b')::uuid,'Both sides disappear' from public.conversations where current_setting('d.a')::uuid in(user_low,user_high);
+-- prepare_report uses auth.uid() even as postgres; switch claims to the reporter.
+select set_config('request.jwt.claim.sub',current_setting('d.b'),true);
+select set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('d.b'),'session_id',current_setting('d.sb'),'amr',jsonb_build_array(jsonb_build_object('method','password','timestamp',extract(epoch from now())::bigint)))::text,true);
+insert into public.content_reports(id,reporter_id,target_kind,target_id,reason) values(gen_random_uuid(),current_setting('d.b')::uuid,'post',current_setting('d.post')::uuid,'Otro');
+insert into public.moderation_audit(id,report_id,moderator_id,action,note) select gen_random_uuid(),id,current_setting('d.c')::uuid,'review','Synthetic review' from public.content_reports where reporter_id=current_setting('d.b')::uuid;
+insert into public.moderation_holds(target_kind,target_id,updated_by) values('post',current_setting('d.post')::uuid,current_setting('d.c')::uuid);
+set local role authenticated;
+select pg_temp.d_check('other account has its own status',public.account_deletion('status')->>'pending'='false');
+select pg_temp.d_denied('other account cannot finish target deletion', $$select public.account_deletion('finish','ELIMINAR')$$,'DELETION_NOT_STARTED');
+select pg_temp.d_check('other account fails Storage delete policy',not (split_part(current_setting('d.a')||'/test.png','/',1)=auth.uid()::text and public.own_account_deleting()));
+reset role;
+-- The membership changes below are invisible outside this transaction and rolled back.
+create temporary table original_moderators as select * from public.moderators;
+delete from public.moderators;
+insert into public.moderators(user_id) values(current_setting('d.b')::uuid);
+set local role authenticated;
+select pg_temp.d_denied('last moderator cannot delete', $$select public.account_deletion('begin','ELIMINAR')$$,'LAST_MODERATOR');
+reset role;
+insert into public.moderators(user_id) values(current_setting('d.c')::uuid);
+select set_config('d.comment',gen_random_uuid()::text,true);
+insert into public.comments(id,user_id,post_id,body) values(current_setting('d.comment')::uuid,current_setting('d.b')::uuid,current_setting('d.post')::uuid,'Temporary comment');
+insert into public.moderation_holds(target_kind,target_id,updated_by) values('comment',current_setting('d.comment')::uuid,current_setting('d.b')::uuid);
+select set_config('request.jwt.claim.sub',current_setting('d.c'),true);
+select set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('d.c'))::text,true);
+insert into public.content_reports(id,reporter_id,target_kind,target_id,reason) values(gen_random_uuid(),current_setting('d.c')::uuid,'post',current_setting('d.post')::uuid,'Otro');
+insert into public.moderation_audit(id,report_id,moderator_id,action,note) select gen_random_uuid(),id,current_setting('d.b')::uuid,'review','Note from departing moderator' from public.content_reports where reporter_id=current_setting('d.c')::uuid;
+select set_config('request.jwt.claim.sub',current_setting('d.b'),true);
+select set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('d.b'),'session_id',current_setting('d.sb'),'amr',jsonb_build_array(jsonb_build_object('method','oauth','timestamp',extract(epoch from now())::bigint)))::text,true);
+set local role authenticated;
+select public.account_deletion('begin','ELIMINAR');
+select pg_temp.d_check('fileless account can begin',public.own_account_deleting());
+reset role;
+set local role authenticated;
+select pg_temp.d_check('fileless manifest is empty',public.account_deletion('files','ELIMINAR')->'files'='[]'::jsonb);
+select pg_temp.d_check('finish reports success',public.account_deletion('finish','ELIMINAR')->>'deleted'='true');
+select pg_temp.d_denied('deleted session cannot use deletion RPC', $$select public.account_deletion('status')$$,'SIGN_IN_REQUIRED');
+select pg_temp.d_denied('old JWT cannot recreate profile', $$insert into public.profiles(id,display_name) values(auth.uid(),'Back')$$,'ACCOUNT_UNAVAILABLE');
+select pg_temp.d_denied('old JWT cannot create orphan file', $$insert into storage.objects(bucket_id,name) values('review-media',auth.uid()::text||'/orphan.png')$$,'row-level security');
+reset role;
+select pg_temp.d_check('Auth user removed',not exists(select 1 from auth.users where id=current_setting('d.b')::uuid));
+select pg_temp.d_check('Auth sessions removed',not exists(select 1 from auth.sessions where user_id=current_setting('d.b')::uuid));
+select pg_temp.d_check('profile removed',not exists(select 1 from public.profiles where id=current_setting('d.b')::uuid));
+select pg_temp.d_check('conversation and other participant messages removed',not exists(select 1 from public.conversations where current_setting('d.b')::uuid in(user_low,user_high)));
+select pg_temp.d_check('reviewed report audit cascades correctly',not exists(select 1 from public.content_reports where reporter_id=current_setting('d.b')::uuid));
+select pg_temp.d_check('pending marker removed',not exists(select 1 from public.account_deletions where user_id=current_setting('d.b')::uuid));
+select pg_temp.d_check('other account and its file remain intact',exists(select 1 from auth.users where id=current_setting('d.a')::uuid) and exists(select 1 from storage.objects where name=current_setting('d.a')||'/test.png'));
+select pg_temp.d_check('owned comment and its moderation hold removed',not exists(select 1 from public.comments where id=current_setting('d.comment')::uuid) and not exists(select 1 from public.moderation_holds where target_id=current_setting('d.comment')::uuid));
+select pg_temp.d_check('remaining audit has no departed moderator identity or note',exists(select 1 from public.moderation_audit a join public.content_reports r on r.id=a.report_id where r.reporter_id=current_setting('d.c')::uuid and a.moderator_id is null and a.note='Cuenta eliminada'));
+select pg_temp.d_check('other moderator remains',exists(select 1 from public.moderators where user_id=current_setting('d.c')::uuid));
+-- A missing/revoked session is denied independently of JWT expiration.
+delete from auth.sessions where id=current_setting('d.sa')::uuid;
+select set_config('request.jwt.claim.sub',current_setting('d.a'),true);
+select set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub',current_setting('d.a'),'session_id',current_setting('d.sa'))::text,true);
+set local role authenticated;
+select pg_temp.d_denied('revoked session denied', $$select public.account_deletion('begin','ELIMINAR')$$,'SIGN_IN_REQUIRED');
+set local role anon;
+select pg_temp.d_denied('anonymous RPC denied', $$select public.account_deletion('begin','ELIMINAR')$$,'permission denied');
+reset role;
+select count(*) as checks,count(*) filter(where passed) as passed,coalesce(jsonb_agg(check_name) filter(where not passed),'[]'::jsonb) as failures from deletion_results;
+rollback;

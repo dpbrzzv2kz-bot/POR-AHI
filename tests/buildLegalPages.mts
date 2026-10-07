@@ -1,0 +1,9 @@
+// Emit the same text as the app routes into HTML for direct links and crawlers.
+import {mkdir,writeFile} from 'node:fs/promises';
+import {LEGAL_VERSION,legalReady,privacySections,termsSections} from '../lib/legalContent.ts';
+const escape=(value:string)=>value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+if(process.argv.includes('--publish')&&!legalReady)throw new Error('Confirma el nombre legal y domicilio del responsable antes de publicar.');
+for(const [route,title,sections] of [['privacy','Aviso de privacidad',privacySections],['terms','Condiciones de la beta',termsSections]] as const){
+ const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · Por Ahí</title><style>body{margin:0;background:#fbf9f4;color:#334b3b;font:16px/1.6 system-ui,sans-serif}main{max-width:680px;margin:auto;padding:36px 24px 60px}h1,h2{color:#243d31;line-height:1.3}h1{font-size:30px}h2{font-size:20px;margin-top:32px}a{color:#965337}.warning{padding:16px;border-radius:12px;background:#fff0d8}footer{display:flex;gap:20px;flex-wrap:wrap;margin-top:36px}.version{font-size:14px}</style></head><body><main><a href="/">← Volver a Por Ahí</a><h1>${title}</h1><p class="version">Por Ahí Social · Versión ${LEGAL_VERSION}</p>${legalReady?'':'<p class="warning">Borrador para revisión. Falta confirmar el nombre legal y domicilio del responsable antes de publicar esta versión.</p>'}${sections.map(s=>`<section><h2>${escape(s.title)}</h2><p>${escape(s.text)}</p></section>`).join('')}<footer><a href="/privacy">Privacidad</a><a href="/terms">Condiciones de la beta</a><a href="/delete-account">Eliminar cuenta</a></footer></main></body></html>`;
+ await mkdir(`public/${route}`,{recursive:true});await writeFile(`public/${route}/index.html`,html);
+}

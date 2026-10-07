@@ -19,10 +19,13 @@ const tokens=new Map(profiles.map(p=>[p.id,`${encode({alg:'HS256'})}.${encode({s
 const session=id=>({access_token:tokens.get(id),refresh_token:`local-refresh-${id}`,token_type:'bearer',expires_in:7200,user:userOf(id)});
 const data={posts:[],stories:[],follows:[],post_likes:[],bookmarks:[],comments:[],notifications:[],conversations:[],messages:[],user_blocks:[],content_reports:[]};
 const files=new Map(),uploads=new Map(),events=[];
+const deleting=new Set();
+let failDeletionOnce=process.env.BETA_DELETE_FAILURE==='1';
+if(failDeletionOnce)files.set(`${profiles[2].id}/delete-test.png`,{bytes:Buffer.from('Synthetic local file'),mime:'image/png'});
 let failMessageOnce=true;
 
 // Isolated copies of the existing production export. No Expo code is changed.
-const source=resolve(app,'web-preview');
+const source=resolve(app,process.argv[3]||'web-preview');
 for(const port of ports){
  const root=resolve(preview,String(port));await mkdir(root,{recursive:true});await cp(source,root,{recursive:true});
  const html=await readFile(resolve(root,'index.html'),'utf8');
@@ -72,7 +75,8 @@ async function handle(req,res,port){try{
  if(ports.map(p=>`http://127.0.0.1:${p}`).includes(req.headers.origin))res.setHeader('Access-Control-Allow-Origin',req.headers.origin);
  res.setHeader('Access-Control-Allow-Headers','*');res.setHeader('Access-Control-Expose-Headers','*');res.setHeader('Access-Control-Allow-Methods','GET,HEAD,POST,PATCH,DELETE,OPTIONS');
  if(req.method==='OPTIONS'){res.writeHead(204).end();return;}
- const uid=[...tokens].find(([,token])=>req.headers.authorization===`Bearer ${token}`)?.[0];
+ let uid=[...tokens].find(([,token])=>req.headers.authorization===`Bearer ${token}`)?.[0];
+ if(uid&&!profiles.some(p=>p.id===uid))uid=undefined;
  if(path==='/__fixture'){
   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'}).end(`<!doctype html><meta charset="utf-8"><title>Beta local · tres cuentas ficticias</title><h1>Prueba local de Por Ahí</h1><p>Datos ficticios; sin conexión a Supabase ni Google.</p>${profiles.map((p,i)=>`<p><a href="http://127.0.0.1:${ports[i]}/auth/google#access_token=${tokens.get(p.id)}&refresh_token=local-refresh-${p.id}&token_type=bearer&expires_in=7200">Abrir ${p.display_name}</a></p>`).join('')}<p><a href="/">Explorar sin entrar</a></p><p><a href="/__mobile.html">Vista web a 393 px</a></p><p><a href="/__checks">Resultados del entorno local</a></p>`);return;
  }
@@ -81,6 +85,27 @@ async function handle(req,res,port){try{
  if(path==='/auth/v1/user'){reply(res,uid?userOf(uid):{code:'bad_jwt',msg:'Invalid local session'},uid?200:401);return;}
  if(path==='/auth/v1/token'){const value=await body(req),id=profiles.find(p=>value.refresh_token===`local-refresh-${p.id}`)?.id;reply(res,id?session(id):{code:'invalid_grant'},id?200:400);return;}
  if(path==='/auth/v1/logout'){res.writeHead(204).end();return;}
+ if(path==='/rest/v1/rpc/account_deletion'){
+  const value=await body(req);
+  if(!uid){reply(res,{code:'42501',message:'SIGN_IN_REQUIRED'},403);return;}
+  if(value.p_action==='status'){reply(res,{pending:deleting.has(uid)});return;}
+  if(value.p_confirmation!=='ELIMINAR'){reply(res,{message:'CONFIRMATION_REQUIRED'},400);return;}
+  if(value.p_action==='begin'){deleting.add(uid);event('deletion_started',uid);reply(res,{pending:true});return;}
+  if(!deleting.has(uid)){reply(res,{message:'DELETION_NOT_STARTED'},400);return;}
+  const ownFiles=[...files.keys()].filter(path=>path.startsWith(`${uid}/`));
+  if(value.p_action==='files'){reply(res,{files:ownFiles.slice(0,100)});return;}
+  if(value.p_action==='finish'){
+   if(ownFiles.length){reply(res,{message:'FILES_REMAIN'},400);return;}
+   event('account_deleted',uid);profiles.splice(profiles.findIndex(p=>p.id===uid),1);deleting.delete(uid);reply(res,{deleted:true});return;
+  }
+ }
+ if(path==='/storage/v1/object/review-media'&&req.method==='DELETE'){
+  const value=await body(req);
+  if(!uid||!deleting.has(uid)||value.prefixes.some(path=>!path.startsWith(`${uid}/`))){reply(res,{message:'Denied'},403);return;}
+  if(failDeletionOnce){failDeletionOnce=false;reply(res,{message:'Temporary failure'},503);return;}
+  for(const name of value.prefixes)files.delete(name);
+  event('deletion_files_removed',uid,{count:value.prefixes.length});reply(res,value.prefixes.map(name=>({name})));return;
+ }
  if(path.startsWith('/rest/v1/rpc/')){await bytes(req);reply(res,path.endsWith('is_moderator')?false:[]);return;}
  if(path.startsWith('/rest/v1/')){
   const table=path.split('/').at(-1);
