@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve,extname,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const app=fileURLToPath(new URL('../',import.meta.url)),workspace=resolve(app,'../..');
-const root=resolve(workspace,'work/urban-design-preview');
+const root=resolve(workspace,process.argv[2]||'work/urban-design-preview');
 if(!root.startsWith(workspace+sep))throw Error('Preview must stay inside the workspace');
 const types={'.html':'text/html; charset=utf-8','.js':'application/javascript','.png':'image/png','.svg':'image/svg+xml','.ico':'image/x-icon','.webmanifest':'application/manifest+json'};
 createServer(async(req,res)=>{try{
