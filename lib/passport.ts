@@ -2,14 +2,34 @@ export type PassportStamp={id:string;name:string;country:string};
 export const passportRanks=[
  {min:0,name:'De estreno'},
  {min:1,name:'Primer paso'},
+ {min:2,name:'Curioso de banqueta'},
  {min:3,name:'Pata de perro'},
  {min:5,name:'Mochilero'},
+ {min:7,name:'Caminante'},
  {min:10,name:'Cazarrutas'},
- {min:15,name:'Trotamundos'},
- {min:25,name:'Cruza fronteras'},
- {min:40,name:'Cartógrafo callejero'},
- {min:75,name:'Leyenda del camino'},
- {min:150,name:'Sin fronteras'},
+ {min:13,name:'Explorador'},
+ {min:16,name:'Viajero frecuente'},
+ {min:20,name:'Trotamundos'},
+ {min:25,name:'Aventurero'},
+ {min:30,name:'Rastreador de sabores'},
+ {min:36,name:'Cruza fronteras'},
+ {min:43,name:'Brújula andante'},
+ {min:50,name:'Cartógrafo callejero'},
+ {min:60,name:'Guía local'},
+ {min:70,name:'Nómada'},
+ {min:80,name:'Capitán de ruta'},
+ {min:95,name:'Maestro de rutas'},
+ {min:110,name:'Descubridor'},
+ {min:130,name:'Leyenda del camino'},
+ {min:150,name:'Piloto del mundo'},
+ {min:175,name:'Gran viajero'},
+ {min:200,name:'Embajador del plan'},
+ {min:230,name:'Conquistador de mapas'},
+ {min:265,name:'Señor de los caminos'},
+ {min:300,name:'Coleccionista de mundos'},
+ {min:350,name:'Mito viviente'},
+ {min:400,name:'Dueño del mapa'},
+ {min:500,name:'Sin fronteras'},
 ] as const;
 
 // El sello pertenece a un estado, no a cada reseña. Dos estados homónimos
@@ -28,7 +48,7 @@ export function passportProgress(rawCount:number){
  for(let i=1;i<passportRanks.length;i++)if(count>=passportRanks[i].min)index=i;
  const current=passportRanks[index],next=passportRanks[index+1]??null;
  const progress=next?Math.min(1,(count-current.min)/(next.min-current.min)):1;
- return {count,level:index+1,current,next,remaining:next?next.min-count:0,progress};
+ return {count,level:index+1,total:passportRanks.length,current,next,remaining:next?next.min-count:0,progress};
 }
 
 // Solo aceptamos un PNG generado por el mapa, con un tamaño acotado.

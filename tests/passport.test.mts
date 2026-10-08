@@ -18,14 +18,14 @@ function mapFixture(owner={name:'Ana',handle:'ana',rank:'Primer paso'}){
  return {messages,drawn,listeners,win,html};
 }
 
-test('exactly ten ranks unlock at their state threshold; duplicates cannot supply extra states',()=>{
- assert.equal(passportRanks.length,10);
+test('exactly thirty ranks unlock at their state threshold; duplicates cannot supply extra states',()=>{
+ assert.equal(passportRanks.length,30);
  for(let i=0;i<passportRanks.length;i++){
   assert.equal(passportProgress(passportRanks[i].min).level,i+1);
   if(i)assert.equal(passportProgress(passportRanks[i].min-1).level,i);
  }
  assert.equal(passportProgress(5).current.name,'Mochilero');
- assert.equal(passportProgress(15).current.name,'Trotamundos');
+ assert.equal(passportProgress(20).current.name,'Trotamundos');
  assert.equal(passportProgress(4).remaining,1);
  assert.equal(passportProgress(4).next?.name,'Mochilero');
  assert.equal(passportProgress(10000).next,null);
