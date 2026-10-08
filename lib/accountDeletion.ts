@@ -56,8 +56,8 @@ export async function deleteOwnAccount(client:SupabaseClient,userId:string,confi
  // Bound work; a network failure keeps the account frozen and the next attempt resumes.
  let previous='';
  for(let batch=0;batch<1000;batch++){
-  const remaining=await rpc('files'),paths=validateDeletionFiles(remaining?.files,userId);
-  if(!paths.length){
+  const remaining=await rpc('files'),paths=validateDeletionFiles(remaining?.files,userId),avatarPaths=validateDeletionFiles(remaining?.avatars??[],userId);
+  if(!paths.length&&!avatarPaths.length){
    onProgress?.('account');const result=await rpc('finish');
    if(result?.deleted!==true)throw new Error('No se pudo confirmar la eliminación. Contacta con soporte.');
    // Clearing local credentials must not rely on a network logout after Auth was deleted.
@@ -65,11 +65,11 @@ export async function deleteOwnAccount(client:SupabaseClient,userId:string,confi
    if(current.data.session?.user.id===userId)await client.auth.signOut({scope:'local'});
    return;
   }
-  const fingerprint=JSON.stringify(paths);
+  const fingerprint=JSON.stringify([paths,avatarPaths]);
   if(fingerprint===previous)throw new Error('No se pudieron retirar los archivos pendientes. Contacta con soporte.');
   previous=fingerprint;
-  const {error}=await fixed.storage.from('review-media').remove(paths);
-  if(error)throw deletionError(error);
+  if(paths.length){const {error}=await fixed.storage.from('review-media').remove(paths);if(error)throw deletionError(error);}
+  if(avatarPaths.length){const {error}=await fixed.storage.from('avatars').remove(avatarPaths);if(error)throw deletionError(error);}
  }
  throw new Error('Quedan archivos pendientes. Pulsa Reintentar eliminación para continuar.');
 }
