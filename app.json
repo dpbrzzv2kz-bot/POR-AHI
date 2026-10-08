@@ -42,7 +42,8 @@
           "microphonePermission": "Por Ahí usa el micrófono para grabar el sonido de tus videos.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "scheme": "porahi"
   }
