@@ -1,4 +1,4 @@
-import React,{useCallback,useMemo,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {View,Text,Pressable,StyleSheet,Platform} from 'react-native';
 import {mapHtml,type PickedPlace} from '../lib/mapHtml';
 import {palette as p} from '../lib/theme';
@@ -10,18 +10,27 @@ export type MapPickerProps={initial?:PickedPlace|null;onCancel:()=>void;onConfir
 export default function MapPickerShell({initial,onCancel,onConfirm,surface,confirmLabel='Usar esta ubicación',cancelLabel='Cancelar'}:MapPickerProps&{surface:MapSurface}){
  const [picked,setPicked]=useState<PickedPlace|null>(initial||null);
  const html=useMemo(()=>mapHtml(initial),[]); // eslint-disable-line react-hooks/exhaustive-deps
+ // La dirección llega un instante después de tocar el mapa: se espera (máx. 4.5 s) para no guardar la reseña sin ella.
+ const [waiting,setWaiting]=useState(false);
+ const timer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current);},[]);
  const onRaw=useCallback((raw:string)=>{
   try{
    const m=JSON.parse(raw);
-   if(Number.isFinite(m.lat)&&Number.isFinite(m.lng)&&Math.abs(m.lat)<=90&&Math.abs(m.lng)<=180)setPicked({lat:m.lat,lng:m.lng,label:typeof m.label==='string'?m.label.slice(0,80):'',address:typeof m.address==='string'?m.address.slice(0,300):''});
+   if(Number.isFinite(m.lat)&&Number.isFinite(m.lng)&&Math.abs(m.lat)<=90&&Math.abs(m.lng)<=180){
+    const address=typeof m.address==='string'?m.address.slice(0,300):'';
+    setPicked({lat:m.lat,lng:m.lng,label:typeof m.label==='string'?m.label.slice(0,80):'',address});
+    if(timer.current)clearTimeout(timer.current);
+    if(address)setWaiting(false);else{setWaiting(true);timer.current=setTimeout(()=>setWaiting(false),4500);}
+   }
   }catch{/* Mensaje que no es del mapa. */}
  },[]);
  return <View style={s.screen}>
   <View style={s.header}><Text style={s.title}>Elige el lugar</Text><Pressable accessibilityRole="button" accessibilityLabel={cancelLabel} onPress={onCancel} style={s.cancel}><View style={{transform:[{rotate:'45deg'}]}}><Icon name="plus" size={20}/></View><Text style={s.cancelText}>{cancelLabel}</Text></Pressable></View>
   <View style={{flex:1}}>{surface({html,onRaw})}</View>
   <View style={s.footer}>
-   <Text numberOfLines={2} style={s.note}>{picked?(picked.address||picked.label||'Lugar elegido en el mapa. Puedes arrastrar el pin.'):'Busca un lugar por nombre o toca el mapa para poner el pin.'}</Text>
-   <Pressable accessibilityRole="button" accessibilityLabel={confirmLabel} disabled={!picked} onPress={()=>{if(picked)onConfirm(picked);}} style={[s.confirm,!picked&&{opacity:.4}]}><Text style={s.confirmText}>{confirmLabel}</Text></Pressable>
+   <Text numberOfLines={2} style={s.note}>{picked?(waiting?'Buscando la dirección…':picked.address||picked.label||'Lugar elegido en el mapa. Puedes arrastrar el pin.'):'Busca un lugar por nombre o toca el mapa para poner el pin.'}</Text>
+   <Pressable accessibilityRole="button" accessibilityLabel={confirmLabel} disabled={!picked||waiting} onPress={()=>{if(picked&&!waiting)onConfirm(picked);}} style={[s.confirm,(!picked||waiting)&&{opacity:.4}]}><Text style={s.confirmText}>{confirmLabel}</Text></Pressable>
   </View>
  </View>;
 }
