@@ -21,11 +21,18 @@ grant insert on public.post_media to authenticated;
 -- Se ve lo mismo que se ve de la publicacion: bloqueos, moderacion y retiros ya filtran public.posts.
 create policy post_media_read on public.post_media for select to anon,authenticated
  using(exists(select 1 from public.posts p where p.id=post_id));
+-- Las comprobaciones de propiedad van en funciones de seguridad (sin RLS anidado). Hacerlas inline provocaba
+-- "infinite recursion detected in policy for relation post_media": storage.objects lee post_media y post_media lee storage.objects.
+create function public.owns_post(post uuid) returns boolean language sql stable security definer set search_path='' as $$
+ select exists(select 1 from public.posts p where p.id=post and p.user_id=auth.uid());
+$$;
+create function public.own_media_exists(path text) returns boolean language sql stable security definer set search_path='' as $$
+ select split_part(path,'/',1)=auth.uid()::text and exists(select 1 from storage.objects o where o.bucket_id='review-media' and o.name=path);
+$$;
+revoke all on function public.owns_post(uuid),public.own_media_exists(text) from public,anon,authenticated;
+grant execute on function public.owns_post(uuid),public.own_media_exists(text) to authenticated;
 create policy post_media_add_own on public.post_media for insert to authenticated with check(
- user_id=(select auth.uid())
- and exists(select 1 from public.posts p where p.id=post_id and p.user_id=(select auth.uid()))
- and split_part(media_path,'/',1)=(select auth.uid())::text
- and exists(select 1 from storage.objects o where o.bucket_id='review-media' and o.name=media_path)
+ user_id=(select auth.uid()) and public.owns_post(post_id) and public.own_media_exists(media_path)
 );
 -- Misma validacion de tipo y tamano que la portada (010_large_media.sql) y misma proteccion de cuentas en borrado (011).
 create trigger post_media_validation before insert on public.post_media for each row execute function public.validate_visual_media();
