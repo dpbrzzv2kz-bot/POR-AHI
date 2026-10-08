@@ -134,3 +134,22 @@ Limitación del equipo: Windows bloquea `node.exe` por directiva de grupo en las
 - Error sin mensaje en la terminal ligado a `BlockedList` en Perfil: sin investigar.
 - Frase de relleno de biografía en la tarjeta del perfil, y etiquetas repetidas cuando hay un filtro activo: decisiones de diseño abiertas.
 - Para ver la app en iPhone: Expo Go, misma cuenta de Expo en teléfono y computadora, y arrancar con `node node_modules/expo/bin/cli start` (el `npm run` lo bloquea la directiva de grupo de Windows).
+
+## 11. Migraciones y cambios que faltan en producción (actualizado 2026-10-07)
+
+Todo lo siguiente está aplicado **solo en el Supabase de pruebas** ("PRUEBAS POR AHI"). El Supabase real y la web publicada siguen como antes. **Antes de publicar la nueva versión hay que aplicar en producción, en este orden y con confirmación del dueño:**
+1. `supabase/013_avatars.sql`: columna `avatar_path`, bucket público `avatars`, vista `public_profiles` con la foto.
+2. `supabase/014_reactions.sql`: reacción de tomate (`post_tomatoes`), exclusión corazón/tomate y `tomatoes_count` en `post_stats`.
+Si se publica la app sin aplicar esas migraciones, los perfiles y los contadores dejan de cargar.
+
+**Decisiones de producto de esta tanda:**
+- Cada publicación muestra arriba a la derecha cuántos corazones y tomates tiene; abajo se elige corazón o tomate. Es una sola reacción por persona (elegir una quita la otra, lo hace la base de datos). El tomate NO genera notificación al autor. Los comentarios solo se hacen en el detalle.
+- Publicaciones sin recuadro y casi a pantalla completa; la barra oscura "Ver detalles" va sobre la imagen.
+- Stories: un círculo por persona con su foto de perfil y un número si tiene varias; se reproducen en orden (fotos 6 s, videos hasta el final). "Tu story" abre la cámara directo (máx. 30 s, calidad media para no pasar 50 MB); el botón + de reseñas sigue usando la galería.
+- Se quitaron el atajo de guardados junto a la campana (siguen en Perfil → Guardados) y los textos sobre el feed.
+
+**Pendientes nuevos:**
+- Al eliminar una cuenta no se borra su foto de perfil (bucket `avatars`): arreglar antes de publicar.
+- Los scripts `supabase/verify_*.sql` no cubren `post_tomatoes` ni `avatars`.
+- Reseñas de ejemplo (Ana, Luis, Mar) ya no llevan aviso de "ejemplos ficticios" en el feed: decidir si se quitan antes de publicar.
+- La foto de perfil aún no se ve en las tarjetas del feed, en Mensajes ni en los resultados de búsqueda de personas.
