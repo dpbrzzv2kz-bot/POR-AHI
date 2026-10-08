@@ -185,3 +185,13 @@ Una reseña puede tener hasta 10 archivos (fotos y videos mezclados). La primera
 **Dirección:** se guarda al elegir el lugar en el mapa (`posts.address`, migración `020_post_address.sql`; viene de la búsqueda de OpenStreetMap o de una geocodificación inversa al tocar el mapa). Las reseñas anteriores no la tienen.
 
 **Orden de migraciones para producción (todas con confirmación del dueño, antes de publicar):** 013, 014, 015, 016, 017 (018 opcional), 019, 020.
+
+## 15. Las reseñas no se editan (actualizado 2026-10-07)
+
+**Decisión de producto:** una reseña no se puede editar, para que lo que la gente vio y calificó (corazones, tomates) no cambie después, y para que una publicación reportada no se pueda "arreglar" y evadir moderación. Para corregir algo se **elimina y se publica una nueva** (se pierden sus corazones, tomates y comentarios).
+- Migración `supabase/021_no_editing.sql`: quita el permiso de ejecutar `edit_own_review` (verificado en pruebas: responde "permission denied for function"). Los usuarios no tienen UPDATE directo sobre `posts`, así que no queda ninguna vía de edición. Eliminar sigue igual (`content_management`).
+- En la app, `ContentEditor` (`components/OwnContent.tsx`) quedó solo para eliminar; en el detalle el enlace dice "Eliminar mi reseña". El código de `editOwnReview` / `edit_own_review` sigue en el repositorio sin usarse.
+- **Pendiente:** `supabase/verify_own_content.sql` y `tests/ownContent.test.mts` aún prueban la edición y fallarán; actualizarlos antes de publicar. Las erratas ya no se pueden corregir.
+- En el mapa, el botón Publicar espera hasta 4.5 s a que llegue la dirección (la geocodificación inversa tarda ~1 s); antes una reseña publicada de inmediato quedaba sin dirección.
+
+**Orden de migraciones para producción (todas con confirmación del dueño, antes de publicar):** 013, 014, 015, 016, 017 (018 opcional), 019, 020, 021.

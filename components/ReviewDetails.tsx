@@ -6,7 +6,7 @@ import Icon from './Icon';
 
 type Props={review:Review;close:()=>void;manage?:()=>void;report?:()=>void;block?:()=>void};
 // Detalle simple: título, detalles y dirección del lugar. Guardar, compartir y reaccionar viven en la tarjeta.
-// Las acciones de seguridad (editar/eliminar la propia, reportar, bloquear) se conservan detrás de "Más opciones".
+// Las acciones de seguridad (eliminar la propia, reportar, bloquear) se conservan detrás de "Más opciones". Las reseñas no se editan.
 export default function ReviewDetails({review,close,manage,report,block}:Props){
  const [more,setMore]=useState(false);
  return <View style={s.backdrop}><Pressable accessibilityRole="button" accessibilityLabel="Cerrar detalles" onPress={close} style={{flex:1}}/>
@@ -19,7 +19,7 @@ export default function ReviewDetails({review,close,manage,report,block}:Props){
     {!!(manage||report||block)&&<>
      <Pressable accessibilityRole="button" accessibilityState={{expanded:more}} onPress={()=>setMore(value=>!value)} style={s.textButton}><Text style={s.controlText}>{more?'Menos opciones':'Más opciones'}</Text></Pressable>
      {more&&<View style={s.safety}>
-      {manage&&<Pressable accessibilityRole="button" onPress={manage} style={s.textButton}><Text style={s.controlText}>Editar o eliminar mi reseña</Text></Pressable>}
+      {manage&&<Pressable accessibilityRole="button" onPress={manage} style={s.textButton}><Text style={s.controlText}>Eliminar mi reseña</Text></Pressable>}
       {report&&<Pressable accessibilityRole="button" onPress={report} style={s.textButton}><Text style={s.controlText}>Reportar publicación</Text></Pressable>}
       {block&&<Pressable accessibilityRole="button" onPress={block} style={s.textButton}><Text style={s.controlText}>Bloquear autor</Text></Pressable>}
      </View>}
