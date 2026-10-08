@@ -2,16 +2,16 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {loadLibrary,loadStats,setInteraction,type PostStats} from './interactions';
 import {loadPosts,type Review} from './posts';
 export default function useInteractions(userId:string|null,postIds:string[],refreshKey:Review[]){
- const [library,setLibrary]=useState<{owner:string|null;liked:string[];saved:string[];ready:boolean}>({owner:null,liked:[],saved:[],ready:false});
+ const [library,setLibrary]=useState<{owner:string|null;liked:string[];saved:string[];tomatoed:string[];ready:boolean}>({owner:null,liked:[],saved:[],tomatoed:[],ready:false});
  const [stats,setStats]=useState<Record<string,PostStats>>({}),[savedPosts,setSavedPosts]=useState<Review[]>([]),[savedBusy,setSavedBusy]=useState(false);
  const [error,setError]=useState(''),[statsError,setStatsError]=useState(''),[savedError,setSavedError]=useState(''),[busy,setBusy]=useState(false),[attempt,setAttempt]=useState(0),[statsAttempt,setStatsAttempt]=useState(0);
  const epoch=useRef(0),statsEpoch=useRef(0),lock=useRef(false);
  const idsKey=[...new Set([...postIds,...(library.owner===userId?library.saved:[])])].sort().join(',');
- const owned=library.owner===userId?library:{owner:userId,liked:[],saved:[],ready:false};
+ const owned=library.owner===userId?library:{owner:userId,liked:[],saved:[],tomatoed:[],ready:false};
  const savedKey=owned.saved.join(',');
  const refreshCounts=useCallback(()=>setStatsAttempt(n=>n+1),[]);
  const retry=useCallback(()=>setAttempt(n=>n+1),[]);
- useEffect(()=>{let active=true;const controller=new AbortController();epoch.current++;lock.current=false;Promise.resolve().then(()=>{if(active){setBusy(false);setError('');setLibrary({owner:userId,liked:[],saved:[],ready:!userId});}});
+ useEffect(()=>{let active=true;const controller=new AbortController();epoch.current++;lock.current=false;Promise.resolve().then(()=>{if(active){setBusy(false);setError('');setLibrary({owner:userId,liked:[],saved:[],tomatoed:[],ready:!userId});}});
   if(!userId)return()=>{active=false;};
   const timeout=setTimeout(()=>controller.abort(),15000);
   loadLibrary(userId,controller.signal).then(rows=>{if(active)setLibrary({owner:userId,...rows,ready:true});}).catch(e=>{if(active)setError(e.message);});
@@ -25,19 +25,19 @@ export default function useInteractions(userId:string|null,postIds:string[],refr
   loadPosts({postIds:savedKey.split(',')}).then(rows=>{if(active)setSavedPosts(rows);}).catch(e=>{if(active)setSavedError(e.message);}).finally(()=>{if(active)setSavedBusy(false);});
   return()=>{active=false;};
  },[userId,savedKey,attempt,refreshKey]);
- const change=async(postId:string,kind:'like'|'save',cloud:boolean)=>{
+ const change=async(postId:string,kind:'like'|'tomato'|'save',cloud:boolean)=>{
   if(lock.current)return;setError('');
   if(!userId){setError('Inicia sesión desde Perfil para dar me gusta o guardar.');return;}
   if(!cloud){setError('Las maquetas no admiten interacciones. Elige una publicación real.');return;}
   if(!owned.ready){setError('Primero pulsa Reintentar para cargar tus interacciones.');return;}
   const version=epoch.current;lock.current=true;setBusy(true);
-  const enabled=!(kind==='like'?owned.liked:owned.saved).includes(postId);
+  const enabled=!(kind==='like'?owned.liked:kind==='tomato'?owned.tomatoed:owned.saved).includes(postId);
   try{await setInteraction(userId,postId,kind,enabled);
    if(version!==epoch.current)return;
-   setLibrary(p=>{if(p.owner!==userId)return p;const field=kind==='like'?'liked':'saved';return {...p,[field]:enabled?[...new Set([...p[field],postId])]:p[field].filter(id=>id!==postId)};});
+   setLibrary(p=>{if(p.owner!==userId)return p;const field=kind==='like'?'liked':kind==='tomato'?'tomatoed':'saved';const next={...p,[field]:enabled?[...new Set([...p[field],postId])]:p[field].filter(id=>id!==postId)};if(enabled&&kind==='like')next.tomatoed=next.tomatoed.filter(id=>id!==postId);if(enabled&&kind==='tomato')next.liked=next.liked.filter(id=>id!==postId);return next;});
    const statVersion=++statsEpoch.current;const rows=await loadStats(idsKey?idsKey.split(','):[postId]);if(version===epoch.current&&statVersion===statsEpoch.current)setStats(rows);
   }catch(e){if(version===epoch.current)setError(e instanceof Error?e.message:'No se pudo guardar.');}
   finally{if(version===epoch.current){lock.current=false;setBusy(false);}}
  };
- return {saved:owned.saved,liked:owned.liked,stats,savedPosts:userId&&library.owner===userId?savedPosts.filter(p=>owned.saved.includes(p.id)):[],savedBusy,savedError,error:error||statsError,busy,ready:owned.ready,retry,refreshCounts,change};
+ return {saved:owned.saved,liked:owned.liked,tomatoed:owned.tomatoed,stats,savedPosts:userId&&library.owner===userId?savedPosts.filter(p=>owned.saved.includes(p.id)):[],savedBusy,savedError,error:error||statsError,busy,ready:owned.ready,retry,refreshCounts,change};
 }

@@ -1,27 +1,28 @@
 import {supabase} from './supabase';
-export type PostStats={likes:number;comments:number};
+export type PostStats={likes:number;comments:number;tomatoes:number};
 export type Comment={id:string;user_id:string;author_name:string;body:string;created_at:string};
 export async function loadLibrary(userId:string,signal?:AbortSignal){
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  let likes=supabase.from('post_likes').select('post_id').eq('user_id',userId);
  let saves=supabase.from('bookmarks').select('post_id').eq('user_id',userId).order('created_at',{ascending:false});
- if(signal){likes=likes.abortSignal(signal);saves=saves.abortSignal(signal);}
- const [a,b]=await Promise.all([likes,saves]);
- if(a.error||b.error)throw new Error('No se pudieron cargar tus me gusta y guardados. Pulsa Reintentar.');
- return {liked:(a.data||[]).map(r=>r.post_id),saved:(b.data||[]).map(r=>r.post_id)};
+ let tomatoes=supabase.from('post_tomatoes').select('post_id').eq('user_id',userId);
+ if(signal){likes=likes.abortSignal(signal);saves=saves.abortSignal(signal);tomatoes=tomatoes.abortSignal(signal);}
+ const [a,b,c]=await Promise.all([likes,saves,tomatoes]);
+ if(a.error||b.error||c.error)throw new Error('No se pudieron cargar tus me gusta y guardados. Pulsa Reintentar.');
+ return {liked:(a.data||[]).map(r=>r.post_id),saved:(b.data||[]).map(r=>r.post_id),tomatoed:(c.data||[]).map(r=>r.post_id)};
 }
 export async function loadStats(ids:string[],signal?:AbortSignal):Promise<Record<string,PostStats>>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  if(!ids.length)return {};
- let request=supabase.from('post_stats').select('post_id,likes_count,comments_count').in('post_id',ids);
+ let request=supabase.from('post_stats').select('post_id,likes_count,comments_count,tomatoes_count').in('post_id',ids);
  if(signal)request=request.abortSignal(signal);
  const {data,error}=await request;
  if(error)throw new Error('No se pudieron cargar los contadores. Pulsa Actualizar publicaciones.');
- return Object.fromEntries((data||[]).map(r=>[r.post_id,{likes:Number(r.likes_count),comments:Number(r.comments_count)}]));
+ return Object.fromEntries((data||[]).map(r=>[r.post_id,{likes:Number(r.likes_count),comments:Number(r.comments_count),tomatoes:Number(r.tomatoes_count)}]));
 }
-export async function setInteraction(userId:string,postId:string,kind:'like'|'save',enabled:boolean){
+export async function setInteraction(userId:string,postId:string,kind:'like'|'tomato'|'save',enabled:boolean){
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
- const table=kind==='like'?'post_likes':'bookmarks';
+ const table=kind==='like'?'post_likes':kind==='tomato'?'post_tomatoes':'bookmarks';
  const {error}=enabled?await supabase.from(table).upsert({user_id:userId,post_id:postId},{onConflict:'user_id,post_id',ignoreDuplicates:true}):await supabase.from(table).delete().eq('user_id',userId).eq('post_id',postId);
  if(error)throw new Error('No se pudo guardar el cambio. Comprueba tu sesión y vuelve a intentar.');
 }
