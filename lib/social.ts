@@ -29,3 +29,11 @@ export async function getPublicProfile(id:string):Promise<PublicProfile|null>{
  if(error)throw new Error('No se pudo abrir el perfil. Vuelve a intentar.');
  return data?{id:data.id,name:data.display_name,handle:data.username,bio:data.bio,symbol:data.display_name[0]?.toUpperCase()||'?',avatarPath:data.avatar_path}:null;
 }
+
+// Fotos de perfil de varias personas (para las stories). Devuelve {id: ruta|null}.
+export async function loadAvatars(ids:string[]):Promise<Record<string,string|null>>{
+ if(!supabase)throw new Error('La conexión todavía no está configurada.');
+ const {data,error}=await supabase.from('public_profiles').select('id,avatar_path').in('id',ids.slice(0,60));
+ if(error)throw new Error('No se pudieron cargar las fotos de perfil.');
+ return Object.fromEntries((data||[]).map(row=>[row.id,row.avatar_path||null]));
+}
