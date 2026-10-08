@@ -1,4 +1,4 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {View,Text,Image,Pressable,Animated,Easing,StyleSheet,Platform} from 'react-native';
 import {StatusBar} from 'expo-status-bar';
 import type {Story} from '../lib/posts';
@@ -14,10 +14,14 @@ const ago=(since:number)=>{
 
 // Visor de stories como en Instagram: pantalla completa, barritas de progreso arriba (una por story), toque a la derecha para
 // la siguiente y a la izquierda para la anterior. Las fotos duran autoAdvanceMs; los videos avisan al terminar (onEnd en App).
-export default function StoryViewer({story,own,media,close,remove,report,index=0,total=1,onPrev,onNext,autoAdvanceMs,avatarUri,paused=false,onHold}:{story:Story;own:boolean;media:React.ReactNode;close:()=>void;remove:()=>void;report:()=>void;index?:number;total?:number;onPrev?:()=>void;onNext?:()=>void;autoAdvanceMs?:number;avatarUri?:string|null;paused?:boolean;onHold?:(holding:boolean)=>void}){
+export default function StoryViewer({story,own,media,close,remove,report,index=0,total=1,onPrev,onNext,autoAdvanceMs,avatarUri,paused=false,onHold}:{story:Story;own:boolean;media:React.ReactNode|((onProgress:(currentTime:number,duration:number)=>void,paused:boolean)=>React.ReactNode);close:()=>void;remove:()=>void;report:()=>void;index?:number;total?:number;onPrev?:()=>void;onNext?:()=>void;autoAdvanceMs?:number;avatarUri?:string|null;paused?:boolean;onHold?:(holding:boolean)=>void}){
  const next=useRef(onNext);
  useEffect(()=>{next.current=onNext;},[onNext]);
- const progress=useRef(new Animated.Value(0)).current,current=useRef(0);
+ const [progress]=useState(()=>new Animated.Value(0)),current=useRef(0);
+ const videoProgress=useCallback((currentTime:number,duration:number)=>{
+  const value=Number.isFinite(currentTime)&&Number.isFinite(duration)&&duration>0?Math.max(0,Math.min(1,currentTime/duration)):0;
+  progress.setValue(value);
+ },[progress]);
  const [menu,setMenu]=useState(false);
  const stageWidth=useRef(0),holdTimer=useRef<ReturnType<typeof setTimeout>|null>(null),holding=useRef(false);
  // Toque corto: izquierda = anterior, derecha = siguiente. Mantener presionado (0.2 s) pausa y al soltar continúa.
@@ -26,10 +30,10 @@ export default function StoryViewer({story,own,media,close,remove,report,index=0
  useEffect(()=>()=>{if(holdTimer.current)clearTimeout(holdTimer.current);},[]);
  useEffect(()=>{const id=progress.addListener(({value})=>{current.current=value;});return()=>progress.removeListener(id);},[progress]);
  // Al cambiar de story la barra empieza de cero.
- useEffect(()=>{progress.setValue(0);},[story.id,progress]);
+ useEffect(()=>{current.current=0;progress.setValue(0);},[story.id,progress]);
  // La barra de una foto se llena sola y al terminar pasa a la siguiente; se pausa mientras el menú está abierto.
  useEffect(()=>{
-  if(!autoAdvanceMs){progress.setValue(1);return;}
+  if(!autoAdvanceMs)return;
   if(menu||paused)return;
   const animation=Animated.timing(progress,{toValue:1,duration:Math.max(50,autoAdvanceMs*(1-current.current)),easing:Easing.linear,useNativeDriver:false});
   animation.start(({finished})=>{if(finished)next.current?.();});
@@ -38,7 +42,7 @@ export default function StoryViewer({story,own,media,close,remove,report,index=0
  const width=progress.interpolate({inputRange:[0,1],outputRange:['0%','100%']});
  return <View style={s.screen}><StatusBar style="light"/>
   <View style={s.stage} onLayout={event=>{stageWidth.current=event.nativeEvent.layout.width;}}>
-   <View style={StyleSheet.absoluteFill}>{media||<View style={s.placeholder}><Icon name="photos" color={p.darkMuted} size={42}/><Text style={s.note}>STORY DE EJEMPLO · SIN ARCHIVO</Text></View>}</View>
+   <View style={StyleSheet.absoluteFill}>{(typeof media==='function'?media(videoProgress,menu||paused):media)||<View style={s.placeholder}><Icon name="photos" color={p.darkMuted} size={42}/><Text style={s.note}>STORY DE EJEMPLO · SIN ARCHIVO</Text></View>}</View>
    <Pressable accessibilityRole="button" accessibilityLabel="Toca a la derecha para la siguiente story y a la izquierda para la anterior. Mantén presionado para pausar." onPressIn={pressIn} onPressOut={event=>pressOut(event.nativeEvent.locationX)} style={StyleSheet.absoluteFill}/>
    <View pointerEvents="box-none" style={s.top}>
     <View style={s.bars}>{Array.from({length:total}).map((_,i)=><View key={i} style={s.segment}>{i<index?<View style={[s.fill,{width:'100%'}]}/>:i===index?<Animated.View style={[s.fill,{width}]}/>:null}</View>)}</View>
