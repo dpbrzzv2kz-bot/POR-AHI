@@ -35,13 +35,13 @@ export async function loadStories():Promise<Story[]>{
  }));
  return result.flat();
 }
-export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={}){
- return publishVisual(media,pathToken,'posts',{category,place:place.trim(),description:text.trim()},options);
+export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={},location?:{lat:number;lng:number}|null){
+ return publishVisual(media,pathToken,'posts',{category,place:place.trim(),description:text.trim(),...(location?{lat:location.lat,lng:location.lng}:{})},options);
 }
 export async function publishStory(media:Media,pathToken:string,options:PublishOptions={}){
  return publishVisual(media,pathToken,'stories',{},options);
 }
-async function publishVisual(media:Media,pathToken:string,table:'posts'|'stories',fields:Record<string,string>,options:PublishOptions){
+async function publishVisual(media:Media,pathToken:string,table:'posts'|'stories',fields:Record<string,string|number>,options:PublishOptions){
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  checkSignal(options.signal);
  options.progress?.({phase:'preparing',sent:0,total:media.size||0});
