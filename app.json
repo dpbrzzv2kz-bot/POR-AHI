@@ -34,7 +34,15 @@
           "microphonePermission": "Por Ahí usa el micrófono para grabar el sonido de tus videos."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Por Ahí usa la cámara para que grabes tus stories y fotos.",
+          "microphonePermission": "Por Ahí usa el micrófono para grabar el sonido de tus videos.",
+          "recordAudioAndroid": true
+        }
+      ]
     ],
     "scheme": "porahi"
   }
