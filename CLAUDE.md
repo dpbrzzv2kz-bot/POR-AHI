@@ -116,3 +116,21 @@ Limitación del equipo: Windows bloquea `node.exe` por directiva de grupo en las
 - Quién será el titular de las cuentas de Apple y Google.
 - Reglas de la comunidad y política de moderación (revisión por un abogado).
 - Revisión de seguridad por un especialista antes de abrir al público.
+
+## 10. Decisiones de producto y diseño (2026-10-07) y pendientes
+
+**Ya aplicado en el código (probado en iPhone con Expo Go solo lo que se indica):**
+- Acceso obligatorio: sin sesión solo se ve el login. Primer paso al entrar: elegir nombre y @usuario (sin "Sobre ti").
+- Feed único, sin filtros arriba: lo de quienes sigues; si no sigue a nadie, lo más reciente de la comunidad. Jalar hacia abajo para refrescar.
+- Filtro global por categoría desde el cuadrito del logo (Todo, Comer, Divertirse, Explorar). Siempre abre en Todo. Aplica al feed y a Buscar; el perfil tiene su propio filtro. Colores "Neón": Comer #FF9F1C, Divertirse #C26BFF, Explorar #2DE2C0 (en `lib/theme.ts`).
+- Mensajes: directo a conversaciones, con buscador de personas. Buscar: solo selector Reseñas/Personas y buscador.
+- Configuración del perfil en pantalla aparte (icono en la tarjeta del perfil): editar perfil, bloqueados, cerrar sesión, eliminar cuenta.
+- Arreglo importante: subir fotos y videos fallaba siempre en iPhone (la librería contaba 0 bytes). Corregido en `lib/media.ts`; **falta confirmar con videos grandes**.
+
+**Pendiente:**
+- **90/10 del feed:** 90% de quienes sigues y 10% "cerca de ti". El 10% está apartado: la app no guarda la ubicación de cada reseña ni pide la del teléfono. Requiere cambio en base de datos (primero en pruebas) y permiso de ubicación.
+- **Acceso con Google en iPhone:** código escrito (`lib/nativeGoogleSignIn.ts`), sin probar. Falta crear credenciales en Google Cloud (cuenta personal por ahora; pasar a la de la empresa antes de publicar), activarlas en el Supabase de pruebas y agregar `exp://**` y `porahi://**` en Redirect URLs.
+- **Acceso con Apple:** no existe. Requiere cuenta de Apple Developer. Apple suele exigirlo si se ofrece Google (verificar la regla vigente).
+- Error sin mensaje en la terminal ligado a `BlockedList` en Perfil: sin investigar.
+- Frase de relleno de biografía en la tarjeta del perfil, y etiquetas repetidas cuando hay un filtro activo: decisiones de diseño abiertas.
+- Para ver la app en iPhone: Expo Go, misma cuenta de Expo en teléfono y computadora, y arrancar con `node node_modules/expo/bin/cli start` (el `npm run` lo bloquea la directiva de grupo de Windows).
