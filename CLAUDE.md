@@ -50,7 +50,7 @@
 
 Entornos: `.env` = producción, `.env.local` = pruebas (tiene prioridad). Guía en `docs/ENTORNOS.md`. **Antes de publicar, confirmar que `.env.local` no existe.** El Supabase de pruebas aún no está creado.
 
-Limitación del equipo: Windows bloquea `node.exe` por directiva de grupo en las sesiones de Claude, por lo que `tsc`, `lint` y las pruebas no se han podido correr desde aquí.
+Nota del equipo: antes Windows bloqueaba `node.exe` en las sesiones de Claude; ahora sí corre. Comprobaciones: `node node_modules/typescript/bin/tsc --noEmit` (debe dar 0 errores) y `node node_modules/eslint/bin/eslint.js App.tsx components lib src scripts --quiet` (0 errores; quedan 33 avisos antiguos).
 
 ## 4. Decisiones ya tomadas
 
@@ -211,4 +211,8 @@ Una reseña puede tener hasta 10 archivos (fotos y videos mezclados). La primera
 - **Perfil:** la fila de números muestra publicaciones, siguiendo (solo el propio), ♥ y 🍅 recibidos por todas sus publicaciones (`loadReceivedReactions`: suma `post_stats` de hasta 300 publicaciones; sin migración). "Guardados" ya no es una cifra. La tarjeta del mapa de estados muestra "N / total" y, al abrirla, el avance por país (México 3/32…).
 - **Dónde se publica cada cosa:** story desde "Tu story" (cámara), short desde "Subir short" en Videos, reseña desde el botón + del perfil propio (junto a las pestañas de iconos). Se quitó el + de la barra de arriba.
 
-**Orden de migraciones para producción (todas con confirmación del dueño, antes de publicar):** 013, 014, 015, 016, 017 (018 opcional), 019, 020, 021, 022.
+- Visor de stories estilo Instagram (`components/StoryViewer.tsx`): toque derecha = siguiente, izquierda = anterior, mantener presionado = pausa; la cola pasa de una persona a la siguiente. Pendiente confirmar en iPhone.
+- Revisión de ChatGPT (4 puntos, todos ciertos y corregidos): enlace compartido de video abre Inicio; el mapa invalida respuestas de dirección atrasadas (`geoToken`); `useShot` renombrado `acceptShot`; errores de TypeScript resueltos.
+- Migración `supabase/023_account_deletion_avatars.sql`: el borrado de cuenta ahora también retira la foto de perfil (bucket `avatars`); `lib/accountDeletion.ts` la borra. **Pendiente de aplicar en pruebas** y probar el borrado con una cuenta que tenga foto.
+
+**Orden de migraciones para producción (todas con confirmación del dueño, antes de publicar):** 013, 014, 015, 016, 017 (018 opcional), 019, 020, 021, 022, 023.
