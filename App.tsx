@@ -47,10 +47,11 @@ const seed:Review[] = [
  {id:'2',kind:'image',userId:'luis',near:false,category:'Divertirse',place:'Foro Noche',text:'Un escenario pequeño y un ambiente relajado. Llegaría temprano para elegir un buen lugar.',author:'Luis · Ficticio',color:'#716b9b',symbol:'♫'},
  {id:'3',kind:'image',userId:'mar',near:true,category:'Explorar',place:'Galería Abierta',text:'Caminar sin itinerario y detenerse en los detalles. Un buen plan para una mañana libre.',author:'Mar · Ficticia',color:'#668773',symbol:'◈'},
 ];
-function Video({uri,onEnd,contentFit='cover',autoPlay=false}:{uri:string;onEnd?:()=>void;contentFit?:'cover'|'contain';autoPlay?:boolean}){
+function Video({uri,onEnd,contentFit='cover',autoPlay=false,controls=true,paused=false}:{uri:string;onEnd?:()=>void;contentFit?:'cover'|'contain';autoPlay?:boolean;controls?:boolean;paused?:boolean}){
  const player=useVideoPlayer(uri,p=>{p.loop=false;if(autoPlay)p.play();});
+ React.useEffect(()=>{if(paused)player.pause();else if(autoPlay)player.play();},[paused,autoPlay,player]);
  React.useEffect(()=>{if(!onEnd)return;const subscription=player.addListener('playToEnd',onEnd);return()=>subscription.remove();},[player,onEnd]);
- return <VideoView player={player} style={[StyleSheet.absoluteFill,{width:'100%',height:'100%'}]} nativeControls contentFit={contentFit} />;
+ return <VideoView player={player} style={[StyleSheet.absoluteFill,{width:'100%',height:'100%'}]} nativeControls={controls} contentFit={contentFit} />;
 }
 function MediaCard({review,saved,toggle,open,share,height,liked,like,tomato,onTomato,onComments,counts,busy}:{review:Review;saved:boolean;toggle:()=>void;open:()=>void;share:()=>void;height:number;liked:boolean;like:()=>void;tomato:boolean;onTomato:()=>void;onComments:()=>void;counts?:PostStats;busy:boolean}){
  const [ended,setEnded]=useState(false);
@@ -82,6 +83,7 @@ export default function App(){
  const [extras,setExtras]=useState<Media[]>([]);
  const [shorts,setShorts]=useState<Review[]>([]),[shortMode,setShortMode]=useState(false);
  const [commentsPost,setCommentsPost]=useState<Review|null>(null);
+ const [storyHold,setStoryHold]=useState(false);
  const [received,setReceived]=useState<{likes:number;tomatoes:number}|null>(null);
  const [profileStatus,setProfileStatus]=useState<ProfileStatus>('loading');
  const onProfileStatus=React.useCallback((status:ProfileStatus)=>setProfileStatus(previous=>status==='loading'&&previous==='complete'?previous:status),[]);
@@ -103,6 +105,7 @@ export default function App(){
  React.useEffect(()=>{let active=true;setFollowReviews([]);setFollowFeedError('');if(!userId||!followingReady||!following.length){setFollowFeedBusy(false);return;}setFollowFeedBusy(true);loadPosts({userIds:following}).then(rows=>{if(active)setFollowReviews(rows);}).catch(e=>{if(active)setFollowFeedError(e.message);}).finally(()=>{if(active)setFollowFeedBusy(false);});return()=>{active=false;};},[userId,following,followingReady,reviews]);
  const [stories,setStories]=useState<Story[]>([]),[story,setStory]=useState<Story|null>(null);
  const [storyQueue,setStoryQueue]=useState<Story[]>([]);
+ React.useEffect(()=>{Promise.resolve().then(()=>setStoryHold(false));},[story?.id]);
  const [storyAvatars,setStoryAvatars]=useState<Record<string,string|null>>({});
  React.useEffect(()=>{const missing=[...new Set(stories.map(x=>x.userId))].filter(id=>/^[0-9a-f-]{36}$/.test(id)&&!(id in storyAvatars));if(!missing.length)return;let active=true;loadAvatars(missing).then(found=>{if(active)setStoryAvatars(previous=>({...previous,...Object.fromEntries(missing.map(id=>[id,found[id]??null]))}));}).catch(()=>{});return()=>{active=false;};},[stories,storyAvatars]);
  const [contentAction,setContentAction]=useState<ContentAction|null>(null),[contentVersion,setContentVersion]=useState(0),[contentBusy,setContentBusy]=useState(false);
@@ -128,8 +131,8 @@ export default function App(){
  const shared=useSharedReview(reviewParam,userId,safetyVersion+contentVersion);
  const [searchMode,setSearchMode]=useState<'Reseñas'|'Personas'>('Reseñas');
  const discovery=useDiscovery(userId,safetyVersion+contentVersion,tab==='Buscar'&&searchMode==='Reseñas',focus==='Todo'?'Todas':focus as ReviewCategory);
- const sharedId=shared.review?.id,sharedKind=shared.review?.kind;
- React.useEffect(()=>{let active=true;if(sharedId)Promise.resolve().then(()=>{if(active){setTab(sharedKind==='video'?'Videos':'Fotos');setAudience('Para ti');}});return()=>{active=false;};},[sharedId,sharedKind]);
+ const sharedId=shared.review?.id;
+ React.useEffect(()=>{let active=true;if(sharedId)Promise.resolve().then(()=>{if(active){setTab('Fotos');setAudience('Para ti');}});return()=>{active=false;};},[sharedId]);
  const reportItem=(target:ReportTarget)=>{setCommentsPost(null);setDetail(null);setStory(null);setChat(null);setReport(target);};
  const blockPerson=(id:string,name:string)=>{setDetail(null);setStory(null);setChat(null);setBlockTarget({id,name});};
  const safetyLogin=()=>{setReport(null);setBlockTarget(null);setPerson(null);setActivePerson(null);setTab('Perfil');};
@@ -222,7 +225,7 @@ export default function App(){
  };
  const closeCamera=()=>{setCameraOpen(false);if(media)setTimeout(()=>setCompose(true),450);};
  const reshoot=()=>{setCompose(false);setTimeout(()=>setCameraOpen(true),450);};
- const useShot=async(shot:{uri:string;type:'image'|'video';mimeType:string;duration?:number})=>{
+ const acceptShot=async(shot:{uri:string;type:'image'|'video';mimeType:string;duration?:number})=>{
   setCameraOpen(false);
   const generation=++pickGeneration.current;setError('');setBusy(true);
   try{
@@ -264,7 +267,7 @@ export default function App(){
  const activeStories=stories.filter(st=>st.expires>clock);
  // Una persona = un círculo: sus stories se reproducen en orden (de la más vieja a la más nueva). Las propias van primero.
  const storyGroups=[...activeStories.reduce((map,st)=>{const rows=map.get(st.userId)||[];rows.push(st);map.set(st.userId,rows);return map;},new Map<string,Story[]>()).values()].map(rows=>[...rows].sort((x,y)=>x.expires-y.expires)).sort((x,y)=>(y[0].userId===userId?1:0)-(x[0].userId===userId?1:0));
- const openStories=(group:Story[])=>{setStoryQueue(group);setStory(group[0]);};
+ const openStories=(group:Story[])=>{setStoryQueue(storyGroups.flat());setStory(group[0]);};
  const storyIndex=story?storyQueue.findIndex(x=>x.id===story.id):-1;
  const goStory=(step:number)=>{const target=storyQueue[storyIndex+step];if(target)setStory(target);else if(step>0)setStory(null);};
  const profileList=(showSaved?interactions.savedPosts:profileReviews.filter(r=>r.kind===(category==='Videos'?'video':'image'))).filter(r=>profileCategory==='Todas'||r.category===profileCategory);
@@ -303,7 +306,7 @@ export default function App(){
  <Modal visible={!!detail} transparent animationType="slide" onRequestClose={()=>setDetail(null)}>{detail&&<ReviewDetails review={detail} close={()=>setDetail(null)} manage={detail.cloud&&userId&&detail.userId===userId?()=>openContent({kind:'post',id:detail.id,owner:userId,label:detail.place,review:detail}):undefined} report={detail.cloud&&detail.userId!==userId?()=>reportItem({kind:'post',id:detail.id,label:detail.place}):undefined} block={detail.cloud&&detail.userId!==userId&&detail.userId?()=>blockPerson(detail.userId!,detail.author):undefined}/>}</Modal>
  <Modal visible={noticeOpen} animationType="slide" onRequestClose={()=>setNoticeOpen(false)}><NotificationsPanel userId={userId} rows={notices.rows} unread={notices.unread} loading={notices.loading} busy={notices.busy||noticeBusy} error={noticeError||notices.error} refresh={()=>{setNoticeError('');notices.refresh();}} mark={()=>notices.mark()} open={openNotice} close={()=>setNoticeOpen(false)} login={()=>{setNoticeOpen(false);setPerson(null);setActivePerson(null);setShowSaved(false);setTab('Perfil');}}/></Modal>
  <Modal visible={compose} animationType="slide" onRequestClose={()=>{if(!busy){pickGeneration.current++;setCompose(false);}}}><MediaComposer storyMode={storyMode} shortMode={shortMode} location={location} setLocation={setLocation} capture={storyMode&&Platform.OS!=='web'?reshoot:undefined} media={media} busy={busy} place={place} category={category} text={text} error={error} retry={retryPublication} progress={uploadProgress} close={()=>{pickGeneration.current++;setCompose(false);}} pick={pick} publish={publish} pause={()=>uploadController.current?.abort()} setPlace={setPlace} setCategory={setCategory} setText={setText} preview={media?(extras.length>0&&!storyMode?<MediaPager items={[media,...extras]} renderItem={item=>item.type==='image'?<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={item.uri} contentFit="contain"/>}/>:media.type==='image'?<Image source={{uri:media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={media.uri} contentFit="contain" autoPlay={storyMode||shortMode}/>):null}/></Modal>
- <Modal visible={!!story} animationType="fade" onRequestClose={()=>setStory(null)}>{story&&<StoryViewer key={story.id} story={story} avatarUri={avatarUrl(storyAvatars[story.userId])} index={Math.max(0,storyIndex)} total={Math.max(1,storyQueue.length)} onPrev={()=>goStory(-1)} onNext={()=>goStory(1)} autoAdvanceMs={story.media?.type==='image'?6000:undefined} own={!!userId&&story.userId===userId} close={()=>setStory(null)} remove={()=>{if(userId&&story.userId===userId)openContent({kind:'story',id:story.id,owner:userId,label:'Story de '+story.name});}} report={()=>reportItem({kind:'story',id:story.id,label:'Story de '+story.name})} media={story.media?(story.media.type==='image'?<Image source={{uri:story.media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={story.media.uri} contentFit="contain" autoPlay onEnd={()=>goStory(1)}/>):null}/>}</Modal>
+ <Modal visible={!!story} animationType="fade" onRequestClose={()=>setStory(null)}>{story&&<StoryViewer key={story.id} story={story} avatarUri={avatarUrl(storyAvatars[story.userId])} index={Math.max(0,storyQueue.filter(x=>x.userId===story.userId).findIndex(x=>x.id===story.id))} total={Math.max(1,storyQueue.filter(x=>x.userId===story.userId).length)} paused={storyHold} onHold={setStoryHold} onPrev={()=>goStory(-1)} onNext={()=>goStory(1)} autoAdvanceMs={story.media?.type==='image'?5000:undefined} own={!!userId&&story.userId===userId} close={()=>setStory(null)} remove={()=>{if(userId&&story.userId===userId)openContent({kind:'story',id:story.id,owner:userId,label:'Story de '+story.name});}} report={()=>reportItem({kind:'story',id:story.id,label:'Story de '+story.name})} media={story.media?(story.media.type==='image'?<Image source={{uri:story.media.uri}} style={StyleSheet.absoluteFill} resizeMode="cover"/>:<Video uri={story.media.uri} contentFit="cover" autoPlay controls={false} paused={storyHold} onEnd={()=>goStory(1)}/>):null}/>}</Modal>
  <Modal visible={!!shareReview} animationType="slide" onRequestClose={()=>setShareReview(null)}>{shareReview&&<ShareReview key={shareReview.id+'-'+userId} review={shareReview} close={()=>setShareReview(null)}/>}</Modal>
  <Modal visible={!!contentAction&&contentAction.owner===userId} animationType="slide" onRequestClose={()=>{if(!contentBusy)closeContent();}}>{contentAction&&contentAction.owner===userId&&<ContentEditor key={contentAction.kind+contentAction.id+'-'+userId} action={contentAction} close={closeContent} changed={contentChanged} withdrawn={contentWithdrawn} done={()=>{interactions.retry();notices.refresh();refresh();}} busyChange={setContentBusy}/>}</Modal>
  <Modal visible={!!chat&&chat.owner===userId} animationType="slide" onRequestClose={()=>setChat(null)}>{chat&&chat.owner===userId&&userId&&<Chat key={chat.owner+chat.conversation.id} userId={userId} conversation={chat.conversation} close={()=>setChat(null)} report={reportItem} block={()=>blockPerson(chat.conversation.peer_id,chat.conversation.peer_name)}/>}</Modal>
@@ -311,7 +314,7 @@ export default function App(){
  <Modal visible={!!blockTarget} animationType="slide" onRequestClose={()=>setBlockTarget(null)}>{blockTarget&&<BlockConfirm key={blockTarget.id+'-'+userId} target={blockTarget} userId={userId} close={()=>setBlockTarget(null)} done={safetyChanged} login={safetyLogin}/>}</Modal>
  <Modal visible={focusOpen} transparent animationType="fade" onRequestClose={()=>setFocusOpen(false)}><Pressable accessibilityLabel="Cerrar filtro" onPress={()=>setFocusOpen(false)} style={{flex:1,backgroundColor:'rgba(23,23,28,.35)'}}><View style={{marginTop:Platform.OS==='ios'?100:64,marginHorizontal:18,alignSelf:'flex-start',minWidth:230,backgroundColor:p.surface,borderRadius:18,padding:8}}>{['Todo','Comer','Divertirse','Explorar'].map(o=>{const col=o==='Todo'?p.lime:categoryColors[o];return <Pressable key={o} accessibilityRole="button" accessibilityState={{selected:focus===o}} onPress={()=>{setFocus(o);setFocusOpen(false);}} style={{flexDirection:'row',alignItems:'center',gap:12,minHeight:48,paddingHorizontal:12,borderRadius:12,backgroundColor:focus===o?p.soft:'transparent'}}><View style={{width:16,height:16,borderRadius:8,backgroundColor:col,borderWidth:o==='Todo'?1:0,borderColor:p.ink}}/><Text style={{fontSize:15,fontWeight:focus===o?'800':'600',color:p.ink}}>{o}</Text></Pressable>;})}</View></Pressable></Modal>
  <Modal visible={settingsOpen} animationType="slide" onRequestClose={()=>setSettingsOpen(false)}><View style={{flex:1,backgroundColor:p.canvas}}><ScreenHeader close={()=>setSettingsOpen(false)} label="Cerrar configuración"/><ScrollView contentContainerStyle={{padding:20,paddingBottom:40,width:'100%',maxWidth:590,alignSelf:'center'}} keyboardShouldPersistTaps="handled"><Account settings onProfileChange={setOwnProfile} onProfileStatus={onProfileStatus}/></ScrollView></View></Modal>
- <Modal visible={cameraOpen} animationType="slide" onRequestClose={closeCamera}>{cameraOpen&&<StoryCamera onCapture={shot=>{void useShot(shot);}} onGallery={()=>{void shotFromGallery();}} onClose={closeCamera}/>}</Modal>
+ <Modal visible={cameraOpen} animationType="slide" onRequestClose={closeCamera}>{cameraOpen&&<StoryCamera onCapture={shot=>{void acceptShot(shot);}} onGallery={()=>{void shotFromGallery();}} onClose={closeCamera}/>}</Modal>
  <CommentsSheet review={commentsPost} userId={userId} close={()=>setCommentsPost(null)} onChange={interactions.refreshCounts} report={reportItem}/>
  </View>;
 }
