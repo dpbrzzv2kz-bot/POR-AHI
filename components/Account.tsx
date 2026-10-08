@@ -1,10 +1,11 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {View,Text,TextInput,Pressable,StyleSheet,Platform} from 'react-native';
+import {View,Text,TextInput,Image,Pressable,StyleSheet,Platform} from 'react-native';
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 import {Link,router} from 'expo-router';
 import {googleSignInEnabled,startGoogleSignIn} from '../lib/googleSignIn';
 import {signInWithGoogleNative} from '../lib/nativeGoogleSignIn';
+import {avatarUrl,pickAndUploadAvatar,removeAvatar} from '../lib/avatar';
 import {createAuthFetch} from '../lib/authFetch';
 import {legalReady} from '../lib/legalContent';
 import {palette as p} from '../lib/theme';
@@ -12,7 +13,7 @@ import ui from '../lib/uiStyles';
 
 const googleStyles=StyleSheet.create({button:{backgroundColor:p.surface,borderRadius:14,minHeight:48,padding:15,marginTop:12,alignItems:'center',borderWidth:1,borderColor:p.line},text:{color:p.ink,fontWeight:'700'}});
 
-export type Profile={display_name:string;username:string|null;bio:string};
+export type Profile={display_name:string;username:string|null;bio:string;avatar_path?:string|null};
 export type ProfileStatus='loading'|'incomplete'|'complete';
 export default function Account({onProfileChange,onProfileStatus,onboarding=false,settings=false}:{onProfileChange:(profile:Profile|null)=>void;onProfileStatus?:(status:ProfileStatus)=>void;onboarding?:boolean;settings?:boolean}){
  const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(true);
@@ -22,6 +23,8 @@ export default function Account({onProfileChange,onProfileStatus,onboarding=fals
  const [profileLoading,setProfileLoading]=useState(false),[loadAttempt,setLoadAttempt]=useState(0);
  const [googleEnabled,setGoogleEnabled]=useState(false),[googleRetry,setGoogleRetry]=useState(false),[providerAttempt,setProviderAttempt]=useState(0);
  const googleLock=useRef(false);
+ const [avatarPath,setAvatarPath]=useState<string|null>(null),[avatarBusy,setAvatarBusy]=useState(false);
+ const savedRef=useRef<Profile|null>(null);
  const [editingUser,setEditingUser]=useState<string|null>(null);
  const editing=!!session&&(settings||editingUser===session.user.id);
  useEffect(()=>{
@@ -44,15 +47,15 @@ export default function Account({onProfileChange,onProfileStatus,onboarding=fals
   if(session&&supabase){
    const timer=setTimeout(()=>controller.abort(),15000);
    (async()=>{try{
-    const {data,error}=await supabase!.from('profiles').select('display_name,username,bio').eq('id',session.user.id).abortSignal(controller.signal).maybeSingle();
+    const {data,error}=await supabase!.from('profiles').select('display_name,username,bio,avatar_path').eq('id',session.user.id).abortSignal(controller.signal).maybeSingle();
     if(!active)return;
     if(error)throw error;
-    setName(data?.display_name||'');setUsername(data?.username||'');setBio(data?.bio||'');setProfileReady(true);onProfileChange(data);onProfileStatus?.(data?.display_name&&data?.username?'complete':'incomplete');
+    setName(data?.display_name||'');setUsername(data?.username||'');setBio(data?.bio||'');setAvatarPath(data?.avatar_path||null);savedRef.current=data;setProfileReady(true);onProfileChange(data);onProfileStatus?.(data?.display_name&&data?.username?'complete':'incomplete');
    }catch{if(active)setNotice('No se pudo cargar tu perfil. Pulsa Reintentar carga.');}
    finally{clearTimeout(timer);if(active)setProfileLoading(false);}})();
    return()=>{active=false;clearTimeout(timer);controller.abort();};
   }
-  setName('');setUsername('');setBio('');
+  setName('');setUsername('');setBio('');setAvatarPath(null);savedRef.current=null;
   return()=>{active=false;controller.abort();};
  },[session,loadAttempt,onProfileChange,onProfileStatus]);
  const action=async()=>{
@@ -84,11 +87,13 @@ export default function Account({onProfileChange,onProfileStatus,onboarding=fals
   if(!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)){setNotice('El usuario debe tener entre 3 y 24 letras, números o guion bajo, sin espacios. Ejemplo: daniel_perez.');return;}
   setBusy(true);setNotice('');
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
-  try{const {data,error}=await supabase.from('profiles').upsert({id:session.user.id,display_name:name.trim(),username:normalizedUsername,bio:bio.trim()},{onConflict:'id'}).select('display_name,username,bio').abortSignal(controller.signal).single();
+  try{const {data,error}=await supabase.from('profiles').upsert({id:session.user.id,display_name:name.trim(),username:normalizedUsername,bio:bio.trim()},{onConflict:'id'}).select('display_name,username,bio,avatar_path').abortSignal(controller.signal).single();
    if(error){setNotice(error.code==='23505'?'Ese usuario ya está ocupado. Elige otro.':error.code==='42501'?'Tu sesión no tiene acceso. Cierra sesión y vuelve a entrar.':'No se pudo guardar. Reintenta; si continúa, cierra sesión y vuelve a entrar.');}
-   else if(data){setName(data.display_name);setUsername(data.username);setBio(data.bio);onProfileChange(data);onProfileStatus?.('complete');setNotice('Perfil guardado en tu cuenta.');}
+   else if(data){savedRef.current=data;setName(data.display_name);setUsername(data.username);setBio(data.bio);onProfileChange(data);onProfileStatus?.('complete');setNotice('Perfil guardado en tu cuenta.');}
   }catch{setNotice('La conexión tardó demasiado o no está disponible. Vuelve a intentar guardar.');}finally{clearTimeout(timer);setBusy(false);}
  };
+ const changeAvatar=async()=>{if(!session||avatarBusy)return;setAvatarBusy(true);setNotice('');try{const path=await pickAndUploadAvatar(session.user.id,avatarPath);if(path){setAvatarPath(path);const next={...(savedRef.current||{display_name:name,username:username||null,bio}),avatar_path:path};savedRef.current=next;onProfileChange(next);}}catch(e){setNotice(e instanceof Error?e.message:'No se pudo cambiar la foto.');}finally{setAvatarBusy(false);}};
+ const dropAvatar=async()=>{if(!session||!avatarPath||avatarBusy)return;setAvatarBusy(true);setNotice('');try{await removeAvatar(session.user.id,avatarPath);setAvatarPath(null);const next={...(savedRef.current||{display_name:name,username:username||null,bio}),avatar_path:null};savedRef.current=next;onProfileChange(next);}catch(e){setNotice(e instanceof Error?e.message:'No se pudo quitar la foto.');}finally{setAvatarBusy(false);}};
  const button=(text:string,onPress:()=>void,disabled=false,primary=false)=><Pressable accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={[primary?ui.button:ui.secondary,(disabled||busy)&&{opacity:.5}]}><Text style={ui.buttonText}>{text}</Text></Pressable>;
  if(!supabase)return <Text style={styles.note}>La conexión de cuentas aún no está configurada.</Text>;
  if(loading)return <Text style={styles.note}>Cargando tu cuenta…</Text>;
@@ -104,6 +109,7 @@ export default function Account({onProfileChange,onProfileStatus,onboarding=fals
  if(session&&!editing)return <View style={styles.collapsed}><View style={{flex:1,minWidth:0}}><Text style={styles.accountLabel}>TU CUENTA</Text><Text style={styles.compactNote}>Nombre y @usuario</Text></View><Pressable accessibilityRole="button" disabled={busy} onPress={()=>setEditingUser(session.user.id)} style={styles.editButton}><Text style={styles.editText}>Editar perfil</Text></Pressable></View>;
  return <View style={styles.box}><Text style={styles.accountLabel}>{session?'TU CUENTA':'ÚNETE AL PLAN'}</Text><Text style={styles.title}>{session?'Editar perfil':signup?'Crea tu cuenta':'Entra a tu cuenta'}</Text>
  {session?<><Text style={styles.note}>Tu perfil se guarda en la nube. Las reseñas y stories se guardan en la nube; los mensajes de texto son privados entre ambas cuentas.</Text>
+ <View style={{flexDirection:'row',alignItems:'center',gap:14,marginVertical:10}}><View style={{width:72,height:72,borderRadius:24,backgroundColor:p.lime,alignItems:'center',justifyContent:'center',overflow:'hidden'}}>{avatarUrl(avatarPath)?<Image accessibilityLabel="Tu foto de perfil" source={{uri:avatarUrl(avatarPath)!}} style={{width:72,height:72}}/>:<Text style={{fontSize:30,fontWeight:'900',color:p.ink}}>{(name.trim()[0]||'?').toUpperCase()}</Text>}</View><View style={{flex:1}}>{button(avatarBusy?'Subiendo…':avatarPath?'Cambiar foto':'Poner foto',changeAvatar,!profileReady||avatarBusy)}{!!avatarPath&&button('Quitar foto',dropAvatar,avatarBusy)}</View></View>
  <Text style={styles.label}>Nombre</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Nombre del perfil" value={name} onChangeText={setName} maxLength={80} style={styles.input}/>
  <Text style={styles.label}>@usuario</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Usuario del perfil" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={25} style={styles.input}/>
  <Text style={styles.note}>Puedes escribir el usuario con @ y mayúsculas; lo guardaremos en minúsculas.</Text>

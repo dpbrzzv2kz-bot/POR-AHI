@@ -1,12 +1,12 @@
 import React from 'react';
-import {View,Text,Pressable,StyleSheet} from 'react-native';
+import {View,Text,Image,Pressable,StyleSheet} from 'react-native';
 import {palette as p} from '../lib/theme';
 import Icon from './Icon';
 
-export default function ProfileHeader({name,handle,bio,symbol,own,stats,onSettings}:{name:string;handle:string;bio:string;symbol:string;own:boolean;stats:{label:string;value:string}[];onSettings?:()=>void}){
+export default function ProfileHeader({name,handle,bio,symbol,own,stats,onSettings,avatarUri}:{name:string;handle:string;bio:string;symbol:string;own:boolean;stats:{label:string;value:string}[];onSettings?:()=>void;avatarUri?:string|null}){
  return <View style={s.hero}>
-  <View style={s.top}><Text style={s.kicker}>{own?'TU PERFIL':'COMUNIDAD'}</Text>{own&&onSettings?<Pressable accessibilityRole="button" accessibilityLabel="Configuración del perfil" onPress={onSettings} hitSlop={8} style={{width:44,height:44,alignItems:'center',justifyContent:'center',marginRight:-8,marginTop:-8}}><Icon name="settings" color={p.lime} size={26}/></Pressable>:<Icon name="arrow" color={p.lime} size={26}/>}</View>
-  <View style={s.avatar}><Text style={s.initial}>{symbol}</Text></View>
+  <View style={s.top}>{own?<View/>:<Text style={s.kicker}>COMUNIDAD</Text>}{own&&onSettings?<Pressable accessibilityRole="button" accessibilityLabel="Configuración del perfil" onPress={onSettings} hitSlop={8} style={{width:44,height:44,alignItems:'center',justifyContent:'center',marginRight:-8,marginTop:-8}}><Icon name="settings" color={p.lime} size={26}/></Pressable>:<Icon name="arrow" color={p.lime} size={26}/>}</View>
+  <View style={s.avatar}>{avatarUri?<Image accessibilityLabel={'Foto de '+name} source={{uri:avatarUri}} style={{width:70,height:70,borderRadius:23}}/>:<Text style={s.initial}>{symbol}</Text>}</View>
   <Text style={s.name}>{name}</Text><Text style={s.handle}>{handle}</Text><Text style={s.bio}>{bio}</Text>
   <View style={s.stats}>{stats.map(stat=><View key={stat.label} style={s.stat}><Text style={s.value}>{stat.value}</Text><Text style={s.label}>{stat.label}</Text></View>)}</View>
  </View>;

@@ -13,7 +13,7 @@ import type {ReviewCategory} from './lib/discovery';
 import Comments from './components/Comments';
 import NotificationsPanel from './components/NotificationsPanel';
 import {Inbox,Chat} from './components/Messages';
-import {ReportForm,BlockConfirm,BlockedList} from './components/Safety';
+import {ReportForm,BlockConfirm} from './components/Safety';
 import type {ReportTarget} from './lib/safety';
 import {openConversation,type Conversation} from './lib/messages';
 import useNotifications from './lib/useNotifications';
@@ -35,6 +35,7 @@ import s from './lib/appStyles';
 import Icon,{type IconName} from './components/Icon';
 import ProfileHeader from './components/ProfileHeader';
 import ScreenHeader from './components/ScreenHeader';
+import {avatarUrl} from './lib/avatar';
 
 const seed:Review[] = [
  {id:'1',kind:'image',userId:'ana',near:true,category:'Comer',place:'Café del Patio',text:'Café tranquilo, luz de tarde y una mesa para conversar. Lo recomendaría para ir sin prisa con un amigo.',author:'Ana · Ficticia',color:'#b68158',symbol:'☕'},
@@ -188,7 +189,7 @@ export default function App(){
  {tab==='Buscar'&&<DiscoverySearch key={(userId||'guest')+'-'+safetyVersion} mode={searchMode} setMode={setSearchMode} search={discovery} renderReview={r=>renderCard(r,true)} openPerson={u=>{setActivePerson(u);setPerson(u.id);setShowSaved(false);setCategory('Fotos');setTab('Perfil');}}/>}
  {tab==='Mensajes'&&<Inbox key={(userId||'guest')+'-'+safetyVersion} userId={userId} open={conversation=>{if(userId)setChat({owner:userId,conversation});}} login={()=>{setPerson(null);setActivePerson(null);setTab('Perfil');}}/>}
  {tab==='Perfil'&&<>
-  <ProfileHeader own={!activePerson} onSettings={()=>setSettingsOpen(true)} name={activePerson?activePerson.name:(ownProfile?.display_name||'Tu perfil')} symbol={activePerson?activePerson.symbol:(ownProfile?.display_name?.[0]?.toUpperCase()||'T')} handle={activePerson?'@'+activePerson.handle:ownProfile?.username?'@'+ownProfile.username:'Tu próximo plan empieza aquí'} bio={activePerson?activePerson.bio:(ownProfile?.bio||'Tus lugares, tus experiencias y tus próximos planes.')} stats={activePerson?[{label:'publicaciones',value:profileBusy?'—':profileReviews.length+(profileReviews.length===60?'+':'')}]:[{label:'publicaciones',value:profileBusy?'—':profileReviews.length+(profileReviews.length===60?'+':'')},{label:'siguiendo',value:userId&&!followingReady?'—':String(following.length)},{label:'guardados',value:userId&&!interactions.ready?'—':String(saved.length)}]}/>
+  <ProfileHeader own={!activePerson} onSettings={()=>setSettingsOpen(true)} avatarUri={avatarUrl(activePerson?activePerson.avatarPath:ownProfile?.avatar_path)} name={activePerson?activePerson.name:(ownProfile?.display_name||'Tu perfil')} symbol={activePerson?activePerson.symbol:(ownProfile?.display_name?.[0]?.toUpperCase()||'T')} handle={activePerson?'@'+activePerson.handle:ownProfile?.username?'@'+ownProfile.username:'Tu próximo plan empieza aquí'} bio={activePerson?activePerson.bio:(ownProfile?.bio||'Tus lugares, tus experiencias y tus próximos planes.')} stats={activePerson?[{label:'publicaciones',value:profileBusy?'—':profileReviews.length+(profileReviews.length===60?'+':'')}]:[{label:'publicaciones',value:profileBusy?'—':profileReviews.length+(profileReviews.length===60?'+':'')},{label:'siguiendo',value:userId&&!followingReady?'—':String(following.length)},{label:'guardados',value:userId&&!interactions.ready?'—':String(saved.length)}]}/>
   <View style={s.profileBody}>
    {!activePerson&&userId&&<PendingContent key={userId} userId={userId} version={contentVersion} open={openContent}/>}
    {!activePerson&&userId&&moderator.allowed&&button('Administración',()=>router.push('/admin'))}
@@ -217,6 +218,6 @@ export default function App(){
  <Modal visible={!!report} animationType="slide" onRequestClose={()=>setReport(null)}>{report&&<ReportForm key={report.kind+report.id+'-'+userId} target={report} userId={userId} close={()=>setReport(null)} login={safetyLogin}/>}</Modal>
  <Modal visible={!!blockTarget} animationType="slide" onRequestClose={()=>setBlockTarget(null)}>{blockTarget&&<BlockConfirm key={blockTarget.id+'-'+userId} target={blockTarget} userId={userId} close={()=>setBlockTarget(null)} done={safetyChanged} login={safetyLogin}/>}</Modal>
  <Modal visible={focusOpen} transparent animationType="fade" onRequestClose={()=>setFocusOpen(false)}><Pressable accessibilityLabel="Cerrar filtro" onPress={()=>setFocusOpen(false)} style={{flex:1,backgroundColor:'rgba(23,23,28,.35)'}}><View style={{marginTop:Platform.OS==='ios'?100:64,marginHorizontal:18,alignSelf:'flex-start',minWidth:230,backgroundColor:p.surface,borderRadius:18,padding:8}}>{['Todo','Comer','Divertirse','Explorar'].map(o=>{const col=o==='Todo'?p.lime:categoryColors[o];return <Pressable key={o} accessibilityRole="button" accessibilityState={{selected:focus===o}} onPress={()=>{setFocus(o);setFocusOpen(false);}} style={{flexDirection:'row',alignItems:'center',gap:12,minHeight:48,paddingHorizontal:12,borderRadius:12,backgroundColor:focus===o?p.soft:'transparent'}}><View style={{width:16,height:16,borderRadius:8,backgroundColor:col,borderWidth:o==='Todo'?1:0,borderColor:p.ink}}/><Text style={{fontSize:15,fontWeight:focus===o?'800':'600',color:p.ink}}>{o}</Text></Pressable>;})}</View></Pressable></Modal>
- <Modal visible={settingsOpen} animationType="slide" onRequestClose={()=>setSettingsOpen(false)}><View style={{flex:1,backgroundColor:p.canvas}}><ScreenHeader close={()=>setSettingsOpen(false)} label="Cerrar configuración"/><ScrollView contentContainerStyle={{padding:20,paddingBottom:40,width:'100%',maxWidth:590,alignSelf:'center'}} keyboardShouldPersistTaps="handled"><Account settings onProfileChange={setOwnProfile} onProfileStatus={onProfileStatus}/>{!!userId&&<BlockedList key={userId} userId={userId} onChange={safetyChanged}/>}</ScrollView></View></Modal>
+ <Modal visible={settingsOpen} animationType="slide" onRequestClose={()=>setSettingsOpen(false)}><View style={{flex:1,backgroundColor:p.canvas}}><ScreenHeader close={()=>setSettingsOpen(false)} label="Cerrar configuración"/><ScrollView contentContainerStyle={{padding:20,paddingBottom:40,width:'100%',maxWidth:590,alignSelf:'center'}} keyboardShouldPersistTaps="handled"><Account settings onProfileChange={setOwnProfile} onProfileStatus={onProfileStatus}/></ScrollView></View></Modal>
  </View>;
 }
