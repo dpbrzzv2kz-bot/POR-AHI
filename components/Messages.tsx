@@ -1,6 +1,7 @@
 import React,{useState,useEffect,useCallback,useRef} from 'react';
 import {View,Text,Pressable,TextInput,ScrollView,StyleSheet,KeyboardAvoidingView,Platform} from 'react-native';
-import {loadInbox,loadMessages,sendMessage,type Conversation,type Message} from '../lib/messages';
+import {loadInbox,loadMessages,sendMessage,openConversation,type Conversation,type Message} from '../lib/messages';
+import {searchPeople,type PublicProfile} from '../lib/social';
 import type {ReportTarget} from '../lib/safety';
 import {commentId} from '../lib/interactions';
 import {palette as p} from '../lib/theme';
@@ -9,17 +10,24 @@ const button=(label:string,action:()=>void,disabled=false)=><Pressable accessibi
 export function Inbox({userId,open,login}:{userId:string|null;open:(c:Conversation)=>void;login:()=>void}){
  const [rows,setRows]=useState<Conversation[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const alive=useRef(false),generation=useRef(0);
+ const [query,setQuery]=useState(''),[people,setPeople]=useState<PublicProfile[]>([]),[searching,setSearching]=useState(false),[searchError,setSearchError]=useState(''),[starting,setStarting]=useState(false);
+ const term=query.trim();
+ useEffect(()=>{if(!userId||!term){setPeople([]);setSearching(false);setSearchError('');return;}let active=true;const controller=new AbortController();setSearching(true);setSearchError('');
+  const timer=setTimeout(async()=>{try{const found=await searchPeople(term,controller.signal);if(active)setPeople(found.filter(x=>x.id!==userId));}catch(e){if(active)setSearchError(e instanceof Error?e.message:'No se pudo buscar.');}finally{if(active)setSearching(false);}},300);
+  const deadline=setTimeout(()=>controller.abort(),15000);
+  return()=>{active=false;clearTimeout(timer);clearTimeout(deadline);controller.abort();};},[term,userId]);
+ const startWith=async(person:PublicProfile)=>{if(!userId||starting)return;setStarting(true);setSearchError('');try{const conversation=await openConversation(userId,person.id);setQuery('');open(conversation);}catch(e){setSearchError(e instanceof Error?e.message:'No se pudo abrir la conversación.');}finally{setStarting(false);}};
  const refresh=useCallback(async()=>{const g=++generation.current;setBusy(true);setError('');try{const data=await loadInbox();if(alive.current&&g===generation.current)setRows(data);}catch(e){if(alive.current&&g===generation.current)setError((e as Error).message);}finally{if(alive.current&&g===generation.current)setBusy(false);}},[]);
  useEffect(()=>{alive.current=true;if(!userId)return()=>{alive.current=false;};Promise.resolve().then(()=>{if(alive.current)refresh();});const id=setInterval(refresh,30000);return()=>{alive.current=false;clearInterval(id);};},[userId,refresh]);
  return <View style={s.content}>
-  <Text style={s.kicker}>TUS CONVERSACIONES</Text><Text style={s.title}>El plan sigue aquí.</Text><Text style={s.note}>Una recomendación puede ser el inicio de un buen plan.</Text>
-  {!userId?<View style={s.empty}><View style={s.emptyIcon}><Icon name="message" color={p.violet} size={32}/></View><Text style={s.emptyTitle}>Hablemos del próximo plan.</Text><Text style={s.note}>Inicia sesión para conversar con otras personas.</Text>{button('Ir a mi cuenta',login)}</View>:<>
-   <View style={s.inboxToolbar}><Text style={[s.note,{flex:1}]}>Busca una persona, abre su perfil y pulsa Enviar mensaje.</Text><Pressable accessibilityRole="button" accessibilityLabel={busy?'Actualizando…':'Actualizar conversaciones'} disabled={busy} onPress={()=>refresh()} style={s.refresh}><Icon name="refresh" color={p.muted}/></Pressable></View>
+    {!userId?<View style={s.empty}><View style={s.emptyIcon}><Icon name="message" color={p.violet} size={32}/></View><Text style={s.emptyTitle}>Hablemos del próximo plan.</Text><Text style={s.note}>Inicia sesión para conversar con otras personas.</Text>{button('Ir a mi cuenta',login)}</View>:<>
+   <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:16,borderRadius:17,backgroundColor:p.surface,borderWidth:1,borderColor:p.line,minHeight:52,marginBottom:6}}><Icon name="search" size={20} color={p.muted}/><TextInput accessibilityLabel="Buscar personas para enviar un mensaje" value={query} onChangeText={setQuery} placeholder="Buscar personas" placeholderTextColor={p.muted} maxLength={80} autoCapitalize="none" autoCorrect={false} style={{flex:1,minWidth:0,paddingVertical:14,color:p.ink,fontSize:16}}/></View>
+   {term?<>{!!searchError&&<Text accessibilityRole="alert" style={s.error}>{searchError}</Text>}{searching?<Text style={s.note}>Buscando…</Text>:!people.length&&!searchError?<Text style={s.note}>No encontramos personas con esa búsqueda.</Text>:null}{!searching&&people.map(person=><Pressable key={person.id} accessibilityRole="button" accessibilityLabel={'Enviar mensaje a '+person.name} disabled={starting} onPress={()=>startWith(person)} style={[s.row,starting&&{opacity:.5}]}><View style={s.avatar}><Text style={s.initial}>{person.name[0]?.toUpperCase()}</Text></View><View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={s.name}>{person.name}</Text><Text numberOfLines={1} style={s.handle}>@{person.handle}</Text></View></Pressable>)}</>:<>
    {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-   {!busy&&!error&&!rows.length&&<View style={s.empty}><View style={s.emptyIcon}><Icon name="message" color={p.violet} size={32}/></View><Text style={s.emptyTitle}>Todavía no tienes conversaciones.</Text><Text style={s.note}>Propón un plan o comparte una recomendación.</Text></View>}
+   {!busy&&!error&&!rows.length&&<View style={s.empty}><View style={s.emptyIcon}><Icon name="message" color={p.violet} size={32}/></View><Text style={s.emptyTitle}>Todavía no tienes conversaciones.</Text><Text style={s.note}>Usa el buscador de arriba para escribirle a alguien.</Text></View>}
    {rows.map(c=><Pressable key={c.id} accessibilityRole="button" accessibilityLabel={'Conversación con '+c.peer_name} onPress={()=>open(c)} style={s.row}><View style={s.avatar}><Text style={s.initial}>{c.peer_name[0]?.toUpperCase()}</Text></View><View style={{flex:1,minWidth:0}}><View style={s.rowHeading}><Text numberOfLines={1} style={[s.name,{flex:1}]}>{c.peer_name}</Text><Text style={s.date}>{new Date(c.updated_at).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</Text></View><Text numberOfLines={1} style={s.handle}>@{c.peer_handle}</Text><Text numberOfLines={2} style={s.preview}>{c.last_body||'Empieza una conversación…'}</Text></View></Pressable>)}
    {rows.length===50&&<Text style={s.note}>Mostramos las 50 conversaciones más recientes.</Text>}
-  </>}
+  </>}</>}
  </View>;
 }
 export function Chat({userId,conversation,close,report,block}:{userId:string;conversation:Conversation;close:()=>void;report:(target:ReportTarget)=>void;block:()=>void}){
