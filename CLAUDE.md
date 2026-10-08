@@ -173,3 +173,15 @@ Una reseña puede tener hasta 10 archivos (fotos y videos mezclados). La primera
 - **Sin probar:** borrar una publicación con varios archivos (comprobar que no queden archivos en Storage), y la subida desde iPhone.
 - Pendientes: el panel de moderación solo muestra la portada como vista previa; no hay tope de peso total por publicación (10 videos de 50 MB = 500 MB); la selección no se puede editar después de elegirla.
 - Orden de migraciones para producción: 013, 014, 015, 016, 017 (y 018, que es inofensiva allí porque 017 ya trae su corrección). 018 existe solo porque la primera versión de 017, aplicada en pruebas, tenía una recursión infinita en la política de post_media. Verificado en pruebas el 2026-10-07: se guardan portada y extras.
+
+## 14. Shorts, detalle simple y dirección (actualizado 2026-10-07)
+
+**Concepto de producto:** Inicio muestra TODAS las publicaciones (fotos, videos o ambos). La pestaña Videos es solo para **shorts** (estilo TikTok, un video por pantalla, deslizar hacia arriba).
+- Un short es una publicación normal con `posts.is_short=true` y siempre un solo video (migración `019_shorts.sql`); reutiliza reportes, bloqueos, moderación, borrado, corazones, tomates y comentarios. Se sube desde el botón "Subir short" de esa pestaña: video de la galería + título + categoría, sin recomendación ni mapa. Código: `components/ShortsFeed.tsx`, `startShort` en `App.tsx`, modo `short` de `ReviewFlow`.
+- **Pendiente, decidido:** herramienta que arma un short de ~40 s a partir de varios clips, como **lista de clips sin procesar** (la app los reproduce uno tras otro; no genera un archivo único). Falta diseñar recortes y audio. Una versión con video real unido en servidor quedó descartada por ahora (costo y servicio externo).
+- Pendientes de shorts: botón de silenciar; en la web arrancan sin sonido; el perfil aún muestra todo junto en sus pestañas Fotos/Videos; el feed de Inicio y el de shorts comparten el límite de 60 publicaciones por consulta.
+
+**Detalle de una publicación (simple):** solo título, detalles y dirección. Guardar y compartir viven en la tarjeta. Los **comentarios ya no tienen ninguna pantalla** (código en `components/Comments.tsx` sin usar) y el botón de comentarios de los shorts abre ese mismo detalle: decidir pronto dónde viven. Editar/eliminar la propia, reportar y bloquear siguen disponibles detrás de "Más opciones" en el detalle (las tiendas exigen reportar, bloquear y borrar).
+**Dirección:** se guarda al elegir el lugar en el mapa (`posts.address`, migración `020_post_address.sql`; viene de la búsqueda de OpenStreetMap o de una geocodificación inversa al tocar el mapa). Las reseñas anteriores no la tienen.
+
+**Orden de migraciones para producción (todas con confirmación del dueño, antes de publicar):** 013, 014, 015, 016, 017 (018 opcional), 019, 020.

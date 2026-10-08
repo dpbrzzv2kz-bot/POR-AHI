@@ -4,15 +4,16 @@ import {uploadInChunks, checkSignal, waitForOperation, type UploadProgress} from
 import {hydrateReviews} from './reviewMedia';
 
 export type Media={uri:string;type:'image'|'video';mimeType?:string;fileName?:string;file?:File;size?:number;duration?:number};
-export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number;items?:Media[]};
+export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number;items?:Media[];isShort?:boolean;address?:string};
 export type Story={id:string;userId:string;name:string;expires:number;media?:Media;color:string};
 const bucket='review-media';
 type PublishOptions={signal?:AbortSignal;progress?:(value:UploadProgress)=>void};
-export async function loadPosts(filter?:{userId?:string;userIds?:string[];postIds?:string[]},signal?:AbortSignal):Promise<Review[]>{
+export async function loadPosts(filter?:{userId?:string;userIds?:string[];postIds?:string[];shorts?:boolean},signal?:AbortSignal):Promise<Review[]>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  if(filter?.userIds&&!filter.userIds.length)return [];
  if(filter?.postIds&&!filter.postIds.length)return [];
- let request=supabase.from('posts').select('id,user_id,author_name,category,place,description,kind,media_path,edit_version').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(60);
+ let request=supabase.from('posts').select('id,user_id,author_name,category,place,description,kind,media_path,edit_version,is_short,address').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(60);
+ if(filter?.shorts!==undefined)request=request.eq('is_short',filter.shorts);
  if(filter?.userId)request=request.eq('user_id',filter.userId);
  if(filter?.userIds)request=request.in('user_id',filter.userIds);
  if(filter?.postIds)request=request.in('id',filter.postIds);
@@ -35,16 +36,16 @@ export async function loadStories():Promise<Story[]>{
  }));
  return result.flat();
 }
-export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={},location?:{lat:number;lng:number}|null,extras:Media[]=[]){
- const fields={category,place:place.trim(),description:text.trim(),...(location?{lat:location.lat,lng:location.lng}:{})};
+export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={},location?:{lat:number;lng:number;address?:string}|null,extras:Media[]=[],isShort=false){
+ const fields={category,place:place.trim(),description:text.trim(),...(location?{lat:location.lat,lng:location.lng,...(location.address?{address:location.address.slice(0,300)}:{})}:{}),...(isShort?{is_short:true}:{})};
  if(extras.length>9)throw new Error('Una publicación puede tener hasta 10 fotos o videos.');
- if(extras.length)return publishPostMany([media,...extras],pathToken,fields,options);
+ if(extras.length&&!isShort)return publishPostMany([media,...extras],pathToken,fields,options);
  return publishVisual(media,pathToken,'posts',fields,options);
 }
 export async function publishStory(media:Media,pathToken:string,options:PublishOptions={}){
  return publishVisual(media,pathToken,'stories',{},options);
 }
-async function publishVisual(media:Media,pathToken:string,table:'posts'|'stories',fields:Record<string,string|number>,options:PublishOptions){
+async function publishVisual(media:Media,pathToken:string,table:'posts'|'stories',fields:Record<string,string|number|boolean>,options:PublishOptions){
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  checkSignal(options.signal);
  options.progress?.({phase:'preparing',sent:0,total:media.size||0});
@@ -113,7 +114,7 @@ async function uploadIfMissing(input:{media:Media;path:string;size:number;mime:s
 }
 // Publicación con varias fotos o videos: la primera es la portada (posts.media_path); el resto va en post_media.
 // Todo es reintentable: cada archivo se sube una sola vez, la publicación se crea una sola vez y los extras se guardan sin duplicar.
-async function publishPostMany(items:Media[],pathToken:string,fields:Record<string,string|number>,options:PublishOptions){
+async function publishPostMany(items:Media[],pathToken:string,fields:Record<string,string|number|boolean>,options:PublishOptions){
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  checkSignal(options.signal);
  options.progress?.({phase:'preparing',sent:0,total:items.reduce((n,m)=>n+(m.size||0),0)});

@@ -8,21 +8,22 @@ import Icon from './Icon';
 import UploadStatus from './UploadStatus';
 import MapPicker from './MapPicker';
 
-type Props={busy:boolean;place:string;category:string;text:string;error:string;retry:boolean;progress:UploadProgress|null;preview:React.ReactNode;close:()=>void;publish:(location?:PickedPlace)=>void;pause:()=>void;setPlace:(value:string)=>void;setCategory:(value:string)=>void;setText:(value:string)=>void;location?:PickedPlace|null;setLocation?:(value:PickedPlace|null)=>void};
+type Props={busy:boolean;place:string;category:string;text:string;error:string;retry:boolean;progress:UploadProgress|null;preview:React.ReactNode;close:()=>void;publish:(location?:PickedPlace)=>void;pause:()=>void;setPlace:(value:string)=>void;setCategory:(value:string)=>void;setText:(value:string)=>void;location?:PickedPlace|null;setLocation?:(value:PickedPlace|null)=>void;short?:boolean};
 
 // Reseña en pasos sobre la foto a pantalla completa: 1 título, 2 recomendación, 3 mapa (obligatorio, publica), 4 subida.
-export default function ReviewFlow({busy,place,category,text,error,retry,progress,preview,close,publish,pause,setPlace,setCategory,setText,location,setLocation}:Props){
+export default function ReviewFlow({busy,place,category,text,error,retry,progress,preview,close,publish,pause,setPlace,setCategory,setText,location,setLocation,short}:Props){
  const [step,setStep]=useState<1|2|3|4>(1);
  const [titleError,setTitleError]=useState('');
  if(step===3)return <MapPicker initial={location} confirmLabel="Publicar" cancelLabel="Atrás" onCancel={()=>setStep(2)} onConfirm={chosen=>{setLocation?.(chosen);setStep(4);publish(chosen);}}/>;
  const nextFromTitle=()=>{if(place.trim().length<2){setTitleError('Escribe un título de al menos 2 letras.');return;}setTitleError('');setStep(2);};
- const publishLabel=busy?(progress?'Publicando…':'Preparando archivo…'):retry?'Reintentar publicación':'Publicar reseña';
+ const publishShort=()=>{if(place.trim().length<2){setTitleError('Escribe un título de al menos 2 letras.');return;}setTitleError('');setStep(4);publish();};
+ const publishLabel=busy?(progress?'Publicando…':'Preparando archivo…'):retry?'Reintentar publicación':short?'Publicar short':'Publicar reseña';
  return <View style={s.screen}><StatusBar style="light"/>
   <View style={StyleSheet.absoluteFill}>{preview}</View>
   <View pointerEvents="none" style={[StyleSheet.absoluteFill,{backgroundColor:'rgba(0,0,0,.28)'}]}/>
   <View style={s.top}>
    <Pressable accessibilityRole="button" accessibilityLabel="Cancelar" disabled={busy} onPress={close} style={[s.round,busy&&{opacity:.4}]}><View style={{transform:[{rotate:'45deg'}]}}><Icon name="plus" color="#FFFFFF" size={24}/></View></Pressable>
-   <View style={s.dots} accessibilityLabel={'Paso '+Math.min(step,3)+' de 3'}>{[1,2,3].map(n=><View key={n} style={[s.dot,(step===4?3:step)>=n&&s.dotOn]}/>)}</View>
+   {!short&&<View style={s.dots} accessibilityLabel={'Paso '+Math.min(step,3)+' de 3'}>{[1,2,3].map(n=><View key={n} style={[s.dot,(step===4?3:step)>=n&&s.dotOn]}/>)}</View>}
   </View>
   <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={s.bottom} pointerEvents="box-none">
    <View style={s.panel}>
@@ -31,7 +32,7 @@ export default function ReviewFlow({busy,place,category,text,error,retry,progres
      <TextInput autoFocus accessibilityLabel="Título" placeholder="Escribe un título" placeholderTextColor="rgba(255,255,255,.55)" value={place} onChangeText={value=>{setPlace(value);if(titleError)setTitleError('');}} maxLength={100} returnKeyType="next" onSubmitEditing={nextFromTitle} style={s.titleInput}/>
      {!!titleError&&<Text accessibilityRole="alert" style={s.error}>{titleError}</Text>}
      <View style={s.chips}>{Object.keys(categoryColors).map(item=>{const on=category===item;return <Pressable key={item} accessibilityRole="button" accessibilityLabel={'Categoría '+item} accessibilityState={{selected:on}} onPress={()=>setCategory(item)} style={[s.chip,{borderColor:categoryColor(item)},on&&{backgroundColor:categoryColor(item)}]}><Text style={[s.chipText,on&&{color:p.ink}]}>{item}</Text></Pressable>;})}</View>
-     <Pressable accessibilityRole="button" accessibilityLabel="Siguiente" onPress={nextFromTitle} style={s.primary}><Text style={s.primaryText}>Siguiente</Text><Icon name="arrow" size={22}/></Pressable>
+     <Pressable accessibilityRole="button" accessibilityLabel="Siguiente" onPress={short?publishShort:nextFromTitle} style={s.primary}><Text style={s.primaryText}>{short?'Publicar short':'Siguiente'}</Text><Icon name="arrow" size={22}/></Pressable>
     </>}
     {step===2&&<>
      <View style={s.row}><Text style={s.question}>Tu recomendación</Text><Text style={s.optional}>OPCIONAL</Text></View>
@@ -47,7 +48,7 @@ export default function ReviewFlow({busy,place,category,text,error,retry,progres
      {progress&&<View style={s.card}><UploadStatus value={progress}/></View>}
      {busy&&progress&&progress.phase!=='confirming'&&<Pressable accessibilityRole="button" onPress={pause} style={s.secondary}><Text style={s.secondaryText}>Pausar carga</Text></Pressable>}
      <Pressable accessibilityRole="button" accessibilityLabel={publishLabel} disabled={busy} onPress={()=>publish()} style={[s.primary,busy&&{opacity:.5}]}><Text style={s.primaryText}>{publishLabel}</Text><Icon name="arrow" size={22}/></Pressable>
-     {!busy&&<Pressable accessibilityRole="button" accessibilityLabel="Volver al mapa" onPress={()=>setStep(3)} style={s.secondary}><Text style={s.secondaryText}>Cambiar ubicación</Text></Pressable>}
+     {!busy&&<Pressable accessibilityRole="button" accessibilityLabel="Volver al mapa" onPress={()=>setStep(short?1:3)} style={s.secondary}><Text style={s.secondaryText}>{short?'Volver':'Cambiar ubicación'}</Text></Pressable>}
     </>}
    </View>
   </KeyboardAvoidingView>

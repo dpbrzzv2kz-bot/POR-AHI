@@ -11,7 +11,6 @@ import DiscoverySearch from './components/DiscoverySearch';
 import useDiscovery from './lib/useDiscovery';
 import type {ReviewCategory} from './lib/discovery';
 import type {PickedPlace} from './lib/mapHtml';
-import Comments from './components/Comments';
 import NotificationsPanel from './components/NotificationsPanel';
 import {Inbox,Chat} from './components/Messages';
 import {ReportForm,BlockConfirm} from './components/Safety';
@@ -38,6 +37,7 @@ import ProfileHeader from './components/ProfileHeader';
 import ScreenHeader from './components/ScreenHeader';
 import StoryCamera from './components/StoryCamera';
 import MediaPager from './components/MediaPager';
+import ShortsFeed from './components/ShortsFeed';
 import {avatarUrl} from './lib/avatar';
 
 const seed:Review[] = [
@@ -78,6 +78,7 @@ export default function App(){
  const [location,setLocation]=useState<PickedPlace|null>(null);
  const [cameraOpen,setCameraOpen]=useState(false);
  const [extras,setExtras]=useState<Media[]>([]);
+ const [shorts,setShorts]=useState<Review[]>([]),[shortMode,setShortMode]=useState(false);
  const [profileStatus,setProfileStatus]=useState<ProfileStatus>('loading');
  const onProfileStatus=React.useCallback((status:ProfileStatus)=>setProfileStatus(previous=>status==='loading'&&previous==='complete'?previous:status),[]);
  const accent=focus==='Todo'?p.lime:categoryColors[focus];
@@ -102,7 +103,7 @@ export default function App(){
  const openContent=(action:ContentAction)=>{setDetail(null);setStory(null);setContentBusy(false);setContentAction(action);};
  const contentChanged=(review:Review)=>{
   const change=(rows:Review[])=>rows.map(r=>r.id===review.id?review:r);
-  setReviews(change);setProfileReviews(change);setFollowReviews(change);
+  setReviews(change);setShorts(change);setProfileReviews(change);setFollowReviews(change);
  };
  const [chat,setChat]=useState<{owner:string;conversation:Conversation}|null>(null);
  const startChat=async(peerId:string)=>{if(followBusy)return;if(!userId){setSocialError('Inicia sesión desde tu Perfil para enviar mensajes.');return;}const owner=userId,generation=socialGeneration.current;setFollowBusy(true);setSocialError('');try{const conversation=await openConversation(owner,peerId);if(generation===socialGeneration.current){setChat({owner,conversation});setTab('Mensajes');}}catch(e){if(generation===socialGeneration.current)setSocialError((e as Error).message);}finally{if(generation===socialGeneration.current)setFollowBusy(false);}};
@@ -121,22 +122,22 @@ export default function App(){
  const reportItem=(target:ReportTarget)=>{setDetail(null);setStory(null);setChat(null);setReport(target);};
  const blockPerson=(id:string,name:string)=>{setDetail(null);setStory(null);setChat(null);setBlockTarget({id,name});};
  const safetyLogin=()=>{setReport(null);setBlockTarget(null);setPerson(null);setActivePerson(null);setTab('Perfil');};
- const refresh=React.useCallback(async()=>{const generation=++feedGeneration.current;setFeedBusy(true);setFeedError('');const results=await Promise.allSettled([loadPosts(),loadStories()]);if(generation!==feedGeneration.current)return;if(results[0].status==='fulfilled')setReviews(results[0].value.length?results[0].value:initialReviews);if(results[1].status==='fulfilled')setStories(results[1].value);setFeedError(results.filter(r=>r.status==='rejected').map(r=>r.status==='rejected'?(r.reason instanceof Error?r.reason.message:'No se pudo actualizar.'):'').join(' '));setFeedBusy(false);},[]);
+ const refresh=React.useCallback(async()=>{const generation=++feedGeneration.current;setFeedBusy(true);setFeedError('');const results=await Promise.allSettled([loadPosts({shorts:false}),loadStories(),loadPosts({shorts:true})]);if(generation!==feedGeneration.current)return;if(results[0].status==='fulfilled')setReviews(results[0].value.length?results[0].value:initialReviews);if(results[1].status==='fulfilled')setStories(results[1].value);if(results[2].status==='fulfilled')setShorts(results[2].value);setFeedError(results.filter(r=>r.status==='rejected').map(r=>r.status==='rejected'?(r.reason instanceof Error?r.reason.message:'No se pudo actualizar.'):'').join(' '));setFeedBusy(false);},[]);
  React.useEffect(()=>{refresh();const id=setInterval(refresh,50*60*1000);if(!supabase){Promise.resolve().then(()=>setAuthReady(true));return()=>clearInterval(id);}const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{setUserId(next?.user.id||null);setAuthReady(true);});supabase.auth.getSession().then(({data})=>{setUserId(data.session?.user.id||null);setAuthReady(true);});return()=>{clearInterval(id);subscription.unsubscribe();feedGeneration.current++;};},[refresh]);
  React.useEffect(()=>{const id=setInterval(()=>setClock(Date.now()),30000);return()=>clearInterval(id);},[]);
  React.useEffect(()=>{if(story&&story.expires<=clock)setStory(null);},[clock,story]);
- const interactions=useInteractions(userId,[...reviews,...profileReviews,...followReviews,...discovery.reviews,...(detail?[detail]:[]),...(shared.review?[shared.review]:[])].filter(r=>r.cloud).map(r=>r.id),reviews);
+ const interactions=useInteractions(userId,[...reviews,...shorts,...profileReviews,...followReviews,...discovery.reviews,...(detail?[detail]:[]),...(shared.review?[shared.review]:[])].filter(r=>r.cloud).map(r=>r.id),reviews);
  const {saved,liked}=interactions;
  const contentWithdrawn=(target:{kind:'post'|'story';id:string})=>{
   feedGeneration.current++;
   if(target.kind==='post'){
    const remove=(rows:Review[])=>rows.filter(r=>r.id!==target.id);
-   setReviews(remove);setProfileReviews(remove);setFollowReviews(remove);
+   setReviews(remove);setShorts(remove);setProfileReviews(remove);setFollowReviews(remove);
   }else setStories(rows=>rows.filter(r=>r.id!==target.id));
   setContentVersion(n=>n+1);interactions.retry();
  };
  const safetyChanged=()=>{setBlockTarget(null);setDetail(null);setStory(null);setChat(null);setActivePerson(null);setPerson(null);setProfileReviews([]);setFollowReviews([]);setSafetyVersion(n=>n+1);setSocialAttempt(n=>n+1);interactions.retry();notices.refresh();setTab('Perfil');};
- React.useEffect(()=>{let active=true;Promise.resolve().then(()=>{if(active){setReviews(initialReviews);setStories([]);refresh();}});return()=>{active=false;};},[userId,safetyVersion,refresh]);
+ React.useEffect(()=>{let active=true;Promise.resolve().then(()=>{if(active){setReviews(initialReviews);setShorts([]);setStories([]);refresh();}});return()=>{active=false;};},[userId,safetyVersion,refresh]);
  const notices=useNotifications(userId);
  const moderator=useModerator(userId);
  const [noticeOpen,setNoticeOpen]=useState(false),[noticeError,setNoticeError]=useState(''),[noticeBusy,setNoticeBusy]=useState(false);
@@ -153,7 +154,7 @@ export default function App(){
  const tomatoReact=(r:Review)=>interactions.change(r.id,'tomato',!!r.cloud);
  const follow=async(id:string)=>{if(followBusy)return;setSocialError('');if(!userId){setSocialError('Inicia sesión desde tu Perfil para seguir personas.');return;}if(!followingReady){setSocialError('Primero vuelve a cargar tu seguimiento.');return;}const generation=socialGeneration.current;setFollowBusy(true);try{await changeFollow(userId,id,!following.includes(id));const ids=await loadFollowing(userId);if(generation===socialGeneration.current)setFollowing(ids);}catch(e){if(generation===socialGeneration.current)setSocialError(e instanceof Error?e.message:'No se pudo cambiar el seguimiento.');}finally{if(generation===socialGeneration.current)setFollowBusy(false);}};
  const button=(label:string,fn:()=>void,disabled=false)=><Pressable accessibilityRole="button" disabled={disabled} onPress={fn} style={[s.button,disabled&&{opacity:.5}]}><Text style={s.buttonText}>{label}</Text></Pressable>;
- const choose=async(source:'library'|'camera',multiple=false):Promise<'ok'|'cancel'|'error'>=>{
+ const choose=async(source:'library'|'camera',multiple=false,videosOnly=false):Promise<'ok'|'cancel'|'error'>=>{
   if(busy||publishLock.current)return 'cancel';
   const generation=++pickGeneration.current;setError('');
   // A web picker may not report Cancel; avoid locking the form while it is open.
@@ -163,7 +164,7 @@ export default function App(){
    // Cámara: calidad media y 30 s para no pasar el límite de 50 MB de los videos.
    const result=source==='camera'
     ?await ImagePicker.launchCameraAsync({mediaTypes:['images','videos'],allowsEditing:false,quality:.85,videoMaxDuration:30,videoQuality:ImagePicker.UIImagePickerControllerQualityType.Medium})
-    :await ImagePicker.launchImageLibraryAsync({mediaTypes:['images','videos'],allowsEditing:false,quality:.85,...(multiple?{allowsMultipleSelection:true,selectionLimit:10,orderedSelection:true}:{})});
+    :await ImagePicker.launchImageLibraryAsync({mediaTypes:videosOnly?['videos']:['images','videos'],allowsEditing:false,quality:.85,...(multiple?{allowsMultipleSelection:true,selectionLimit:10,orderedSelection:true}:{})});
    if(generation!==pickGeneration.current||result.canceled)return 'cancel';
    const assets=result.assets.slice(0,multiple?10:1);if(assets.some(a=>a.type!=='image'&&a.type!=='video'))throw new Error('Selecciona fotos o videos.');
    setBusy(true);
@@ -186,8 +187,17 @@ export default function App(){
   if(busy||publishLock.current)return;
   if(reviewParam!==undefined)router.setParams({review:undefined});
   pickGeneration.current++;uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-  setStoryMode(isStory);setLocation(null);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);setExtras([]);
+  setStoryMode(isStory);setShortMode(false);setLocation(null);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);setExtras([]);
   const outcome=await choose('library',!isStory);
+  if(outcome!=='cancel')setCompose(true);
+ };
+ // Shorts: se elige un video ya hecho (solo video) y se le pone título y categoría; se publica sin mapa.
+ const startShort=async()=>{
+  if(busy||publishLock.current)return;
+  if(reviewParam!==undefined)router.setParams({review:undefined});
+  pickGeneration.current++;uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+  setStoryMode(false);setShortMode(true);setLocation(null);setCategory('Comer');setMedia(null);setExtras([]);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
+  const outcome=await choose('library',false,true);
   if(outcome!=='cancel')setCompose(true);
  };
  const wait=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
@@ -196,7 +206,7 @@ export default function App(){
   if(Platform.OS==='web'){void pickFirst(true);return;}
   if(reviewParam!==undefined)router.setParams({review:undefined});
   pickGeneration.current++;uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-  setStoryMode(true);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
+  setStoryMode(true);setShortMode(false);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
   setCameraOpen(true);
  };
  const closeCamera=()=>{setCameraOpen(false);if(media)setTimeout(()=>setCompose(true),450);};
@@ -224,19 +234,21 @@ export default function App(){
   if(busy||publishLock.current)return;
   if(!media){setError('Selecciona una foto o video.');return;}
   if(!storyMode&&place.trim().length<2){setError('Escribe un título.');return;}
-  if(!storyMode&&!where){setError('Elige la ubicación en el mapa.');return;}
+  if(!storyMode&&!shortMode&&!where){setError('Elige la ubicación en el mapa.');return;}
   publishLock.current=true;pickGeneration.current++;const controller=new AbortController();uploadController.current=controller;
   setBusy(true);setError('');setRetryPublication(false);
   const options={signal:controller.signal,progress:(value:UploadProgress)=>{if(uploadController.current===controller&&!controller.signal.aborted)setUploadProgress(value);}};
-  try{if(storyMode)await publishStory(media,uploadToken.current,options);else await publishPost(media,place,category,text,uploadToken.current,options,where,extras);
+  try{if(storyMode)await publishStory(media,uploadToken.current,options);else await publishPost(media,place,category,text,uploadToken.current,options,where,extras,shortMode);
    if(uploadController.current!==controller)return;
-   setCompose(false);setMedia(null);setExtras([]);setUploadProgress(null);setTab(storyMode?'Fotos':media.type==='image'?'Fotos':'Videos');setAudience('Para ti');await refresh();
+   setCompose(false);setMedia(null);setExtras([]);setUploadProgress(null);setTab(shortMode?'Videos':'Fotos');setAudience('Para ti');await refresh();
   }catch(e){if(uploadController.current===controller){setError(e instanceof UploadPaused?e.message:e instanceof Error?e.message:'No se pudo publicar. Intenta de nuevo.');setRetryPublication(true);setUploadProgress(value=>value?{...value,sent:value.accepted??value.sent,phase:'paused'}:null);}}
   finally{if(uploadController.current===controller){uploadController.current=null;publishLock.current=false;setBusy(false);}}
  };
  const renderCard=(r:Review,small=false)=><MediaCard key={r.id} review={r} saved={saved.includes(r.id)} toggle={()=>toggle(r)} open={()=>setDetail(r)} share={()=>openShare(r)} liked={liked.includes(r.id)} like={()=>like(r)} tomato={interactions.tomatoed.includes(r.id)} onTomato={()=>tomatoReact(r)} counts={interactions.stats[r.id]} busy={interactions.busy} height={small?340:Math.max(430,height-215)}/>;
  // Feed único: lo de quienes sigues; sin seguidos, lo más reciente de la comunidad. El 10% de cerca de ti queda apartado hasta tener ubicación real.
- const list=(following.length?followReviews:reviews).filter(r=>r.kind===(tab==='Videos'?'video':'image')&&(focus==='Todo'||r.category===focus));
+ const list=(following.length?followReviews:reviews).filter(r=>!r.isShort&&(focus==='Todo'||r.category===focus));
+ const shortList=shorts.filter(r=>focus==='Todo'||r.category===focus);
+ const shortsPlaying=tab==='Videos'&&!compose&&!detail&&!shareReview&&!story&&!noticeOpen&&!cameraOpen&&!focusOpen&&!settingsOpen&&!chat&&!report&&!blockTarget&&!contentAction;
  const activeStories=stories.filter(st=>st.expires>clock);
  // Una persona = un círculo: sus stories se reproducen en orden (de la más vieja a la más nueva). Las propias van primero.
  const storyGroups=[...activeStories.reduce((map,st)=>{const rows=map.get(st.userId)||[];rows.push(st);map.set(st.userId,rows);return map;},new Map<string,Story[]>()).values()].map(rows=>[...rows].sort((x,y)=>x.expires-y.expires)).sort((x,y)=>(y[0].userId===userId?1:0)-(x[0].userId===userId?1:0));
@@ -250,7 +262,7 @@ export default function App(){
  if(profileStatus!=='complete')return <View style={s.app}><StatusBar style="dark"/><View style={s.header}><View style={s.headerInner}><View style={s.brandGroup}><Text accessibilityLabel="Por Ahí" style={s.brand}>por ahí</Text><View style={s.brandMark}><Icon name="arrow" size={20}/></View></View></View></View>
   <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled"><View style={s.profileBody}><Account onboarding onProfileChange={setOwnProfile} onProfileStatus={onProfileStatus}/></View></ScrollView></View>;
  return <View style={s.app}><StatusBar style="dark"/><View style={s.header}><View style={s.headerInner}><View style={s.brandGroup}><Text accessibilityLabel="Por Ahí" style={s.brand}>por ahí</Text><Pressable accessibilityRole="button" accessibilityLabel={'Filtro de categoría: '+focus} onPress={()=>setFocusOpen(true)} hitSlop={12} style={[s.brandMark,{backgroundColor:accent}]}><Icon name="arrow" size={20}/></Pressable>{focus!=='Todo'&&<Text style={{fontSize:12,fontWeight:'800',color:p.ink,marginLeft:2}}>{focus}</Text>}</View><View style={s.headerActions}><Pressable accessibilityRole="button" accessibilityLabel="Nueva foto o video" onPress={()=>{void pickFirst(false);}} style={s.createButton}><Icon name="plus" color={p.onDark} size={22}/></Pressable><Pressable accessibilityRole="button" accessibilityLabel={'Notificaciones'+(notices.unread?' · '+notices.unread+' sin leer':'')} onPress={()=>{setNoticeError('');setNoticeOpen(true);notices.refresh();}} style={s.headerControl}><Icon name="bell" size={23}/>{notices.unread>0&&<View style={s.noticeBadge}><Text style={s.noticeCount}>{notices.unread>99?'99+':notices.unread}</Text></View>}</Pressable></View></View></View>
- <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={feedBusy} onRefresh={()=>{interactions.retry();refresh();}} tintColor={p.violet}/>}>{!!interactions.error&&<View style={s.form}><Text accessibilityRole="alert" style={s.error}>{interactions.error}</Text>{button('Reintentar interacciones',interactions.retry,interactions.busy)}</View>}
+ {tab==='Videos'?<ShortsFeed items={shortList} playing={shortsPlaying} liked={interactions.liked} tomatoed={interactions.tomatoed} stats={interactions.stats} busy={interactions.busy} refreshing={feedBusy} onRefresh={()=>{interactions.retry();refresh();}} onLike={like} onTomato={tomatoReact} onOpen={review=>setDetail(review)} onShare={review=>openShare(review)} onCreate={()=>{void startShort();}}/>:<ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={feedBusy} onRefresh={()=>{interactions.retry();refresh();}} tintColor={p.violet}/>}>{!!interactions.error&&<View style={s.form}><Text accessibilityRole="alert" style={s.error}>{interactions.error}</Text>{button('Reintentar interacciones',interactions.retry,interactions.busy)}</View>}
  {(tab==='Fotos'||tab==='Videos')&&shared.requested&&<><View style={s.form}><Text style={s.personName}>Una recomendación para ti</Text>{button('Explorar otras recomendaciones',()=>{router.setParams({review:undefined});setAudience('Para ti');})}{shared.loading&&<Text accessibilityRole="alert" style={s.body}>Cargando reseña…</Text>}{!!shared.error&&<Text accessibilityRole="alert" style={s.body}>{shared.error}</Text>}{shared.review&&button('Actualizar reseña',shared.retry,shared.loading)}{!!shared.error&&shared.valid&&button('Reintentar reseña',shared.retry)}</View>{shared.review&&renderCard(shared.review)}</>}
  {(tab==='Fotos'||tab==='Videos')&&!shared.requested&&<>{tab==='Fotos'&&<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.storyRow}><Pressable accessibilityRole="button" accessibilityLabel="Crear story" onPress={()=>{void newStory();}} style={s.storyItem}><View style={s.storyCircle}><Text style={s.storyLetter}>＋</Text></View><Text style={s.storyName}>Tu story</Text></Pressable>{storyGroups.map(group=>{const first=group[0];return <Pressable key={first.userId} accessibilityRole="button" accessibilityLabel={'Ver '+(group.length>1?group.length+' stories':'story')+' de '+first.name} onPress={()=>openStories(group)} style={s.storyItem}><View style={[s.storyCircle,{borderColor:p.violet,backgroundColor:p.violet}]}>{avatarUrl(storyAvatars[first.userId])?<Image accessibilityLabel={'Foto de '+first.name} source={{uri:avatarUrl(storyAvatars[first.userId])!}} style={{width:58,height:58,borderRadius:22}}/>:<Text style={[s.storyLetter,{color:'#fff'}]}>{first.name[0]}</Text>}{group.length>1&&<View style={{position:'absolute',right:-4,top:-4,minWidth:20,height:20,borderRadius:10,paddingHorizontal:5,backgroundColor:p.lime,alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:11,fontWeight:'800',color:p.ink}}>{group.length}</Text></View>}</View><Text numberOfLines={1} style={s.storyName}>{first.name.split(' ')[0]}</Text></Pressable>;})}</ScrollView>}{!!feedError&&<Text accessibilityRole="alert" style={s.body}>{feedError}</Text>}{followFeedBusy&&<Text style={s.demo}>Cargando publicaciones de quienes sigues…</Text>}{!!(socialError||followFeedError)&&<Text accessibilityRole="alert" style={s.error}>{socialError||followFeedError}</Text>}{!!socialError&&button('Recargar seguimiento',()=>setSocialAttempt(n=>n+1))}{list.map(r=>renderCard(r))}{!list.length&&<View style={s.form}><Text style={s.body}>Todavía no hay contenido en esta vista. Sigue otro perfil desde Buscar o añade tu propia foto o video.</Text></View>}</>}
  {tab==='Buscar'&&<DiscoverySearch key={(userId||'guest')+'-'+safetyVersion} mode={searchMode} setMode={setSearchMode} search={discovery} renderReview={r=>renderCard(r,true)} openPerson={u=>{setActivePerson(u);setPerson(u.id);setShowSaved(false);setCategory('Fotos');setTab('Perfil');}}/>}
@@ -274,10 +286,10 @@ export default function App(){
   {profileList.map(r=>renderCard(r,true))}{profileCategory!=='Todas'&&!profileBusy&&!profileList.length&&<Text style={s.demo}>No hay publicaciones de esta categoría.</Text>}
   {!activePerson&&!showSaved&&!profileBusy&&!profileError&&!profileReviews.length&&<View style={s.profileEmpty}><Icon name="photos" size={28} color={p.violet}/><Text style={s.profileEmptyTitle}>Aquí van tus recomendaciones.</Text><Text style={s.body}>Pulsa ＋ para añadir tu primera foto o video. Stories y reseñas son formatos separados.</Text></View>}
  </>}
- </ScrollView><View style={s.nav}>{tabs.map(([t,icon])=><Pressable key={t} accessibilityRole="button" accessibilityLabel={'Ir a '+t} accessibilityState={{selected:tab===t}} onPress={()=>{if(reviewParam!==undefined)router.setParams({review:undefined});setTab(t);if(t==='Perfil'){setPerson(null);setActivePerson(null);setShowSaved(false);setCategory('Fotos');}}} style={s.navItem}><View style={[s.navIconBox,tab===t&&s.navIconActive,tab===t&&{backgroundColor:accent}]}><Icon name={icon} size={25} color={tab===t?p.ink:p.darkMuted}/></View></Pressable>)}</View>
- <Modal visible={!!detail} transparent animationType="slide" onRequestClose={()=>setDetail(null)}>{detail&&<ReviewDetails review={detail} saved={saved.includes(detail.id)} busy={interactions.busy} error={interactions.error} close={()=>setDetail(null)} save={()=>toggle(detail)} retry={interactions.retry} share={detail.cloud?()=>openShare(detail):undefined} manage={detail.cloud&&userId&&detail.userId===userId?()=>openContent({kind:'post',id:detail.id,owner:userId,label:detail.place,review:detail}):undefined} report={detail.cloud&&detail.userId!==userId?()=>reportItem({kind:'post',id:detail.id,label:detail.place}):undefined} block={detail.cloud&&detail.userId!==userId&&detail.userId?()=>blockPerson(detail.userId!,detail.author):undefined}>{detail.cloud?<Comments key={detail.id+'-'+userId} postId={detail.id} userId={userId} onChange={interactions.refreshCounts} report={reportItem}/>:<Text style={s.demo}>Los comentarios están disponibles en publicaciones reales.</Text>}</ReviewDetails>}</Modal>
+ </ScrollView>}<View style={s.nav}>{tabs.map(([t,icon])=><Pressable key={t} accessibilityRole="button" accessibilityLabel={'Ir a '+t} accessibilityState={{selected:tab===t}} onPress={()=>{if(reviewParam!==undefined)router.setParams({review:undefined});setTab(t);if(t==='Perfil'){setPerson(null);setActivePerson(null);setShowSaved(false);setCategory('Fotos');}}} style={s.navItem}><View style={[s.navIconBox,tab===t&&s.navIconActive,tab===t&&{backgroundColor:accent}]}><Icon name={icon} size={25} color={tab===t?p.ink:p.darkMuted}/></View></Pressable>)}</View>
+ <Modal visible={!!detail} transparent animationType="slide" onRequestClose={()=>setDetail(null)}>{detail&&<ReviewDetails review={detail} close={()=>setDetail(null)} manage={detail.cloud&&userId&&detail.userId===userId?()=>openContent({kind:'post',id:detail.id,owner:userId,label:detail.place,review:detail}):undefined} report={detail.cloud&&detail.userId!==userId?()=>reportItem({kind:'post',id:detail.id,label:detail.place}):undefined} block={detail.cloud&&detail.userId!==userId&&detail.userId?()=>blockPerson(detail.userId!,detail.author):undefined}/>}</Modal>
  <Modal visible={noticeOpen} animationType="slide" onRequestClose={()=>setNoticeOpen(false)}><NotificationsPanel userId={userId} rows={notices.rows} unread={notices.unread} loading={notices.loading} busy={notices.busy||noticeBusy} error={noticeError||notices.error} refresh={()=>{setNoticeError('');notices.refresh();}} mark={()=>notices.mark()} open={openNotice} close={()=>setNoticeOpen(false)} login={()=>{setNoticeOpen(false);setPerson(null);setActivePerson(null);setShowSaved(false);setTab('Perfil');}}/></Modal>
- <Modal visible={compose} animationType="slide" onRequestClose={()=>{if(!busy){pickGeneration.current++;setCompose(false);}}}><MediaComposer storyMode={storyMode} location={location} setLocation={setLocation} capture={storyMode&&Platform.OS!=='web'?reshoot:undefined} media={media} busy={busy} place={place} category={category} text={text} error={error} retry={retryPublication} progress={uploadProgress} close={()=>{pickGeneration.current++;setCompose(false);}} pick={pick} publish={publish} pause={()=>uploadController.current?.abort()} setPlace={setPlace} setCategory={setCategory} setText={setText} preview={media?(extras.length>0&&!storyMode?<MediaPager items={[media,...extras]} renderItem={item=>item.type==='image'?<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={item.uri} contentFit="contain"/>}/>:media.type==='image'?<Image source={{uri:media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={media.uri} contentFit="contain" autoPlay={storyMode}/>):null}/></Modal>
+ <Modal visible={compose} animationType="slide" onRequestClose={()=>{if(!busy){pickGeneration.current++;setCompose(false);}}}><MediaComposer storyMode={storyMode} shortMode={shortMode} location={location} setLocation={setLocation} capture={storyMode&&Platform.OS!=='web'?reshoot:undefined} media={media} busy={busy} place={place} category={category} text={text} error={error} retry={retryPublication} progress={uploadProgress} close={()=>{pickGeneration.current++;setCompose(false);}} pick={pick} publish={publish} pause={()=>uploadController.current?.abort()} setPlace={setPlace} setCategory={setCategory} setText={setText} preview={media?(extras.length>0&&!storyMode?<MediaPager items={[media,...extras]} renderItem={item=>item.type==='image'?<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={item.uri} contentFit="contain"/>}/>:media.type==='image'?<Image source={{uri:media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={media.uri} contentFit="contain" autoPlay={storyMode||shortMode}/>):null}/></Modal>
  <Modal visible={!!story} animationType="fade" onRequestClose={()=>setStory(null)}>{story&&<StoryViewer key={story.id} story={story} avatarUri={avatarUrl(storyAvatars[story.userId])} index={Math.max(0,storyIndex)} total={Math.max(1,storyQueue.length)} onPrev={()=>goStory(-1)} onNext={()=>goStory(1)} autoAdvanceMs={story.media?.type==='image'?6000:undefined} own={!!userId&&story.userId===userId} close={()=>setStory(null)} remove={()=>{if(userId&&story.userId===userId)openContent({kind:'story',id:story.id,owner:userId,label:'Story de '+story.name});}} report={()=>reportItem({kind:'story',id:story.id,label:'Story de '+story.name})} media={story.media?(story.media.type==='image'?<Image source={{uri:story.media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={story.media.uri} contentFit="contain" autoPlay onEnd={()=>goStory(1)}/>):null}/>}</Modal>
  <Modal visible={!!shareReview} animationType="slide" onRequestClose={()=>setShareReview(null)}>{shareReview&&<ShareReview key={shareReview.id+'-'+userId} review={shareReview} close={()=>setShareReview(null)}/>}</Modal>
  <Modal visible={!!contentAction&&contentAction.owner===userId} animationType="slide" onRequestClose={()=>{if(!contentBusy)closeContent();}}>{contentAction&&contentAction.owner===userId&&<ContentEditor key={contentAction.kind+contentAction.id+'-'+userId} action={contentAction} close={closeContent} changed={contentChanged} withdrawn={contentWithdrawn} done={()=>{interactions.retry();notices.refresh();refresh();}} busyChange={setContentBusy}/>}</Modal>
