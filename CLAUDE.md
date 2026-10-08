@@ -153,3 +153,14 @@ Si se publica la app sin aplicar esas migraciones, los perfiles y los contadores
 - Los scripts `supabase/verify_*.sql` no cubren `post_tomatoes` ni `avatars`.
 - Reseñas de ejemplo (Ana, Luis, Mar) ya no llevan aviso de "ejemplos ficticios" en el feed: decidir si se quitan antes de publicar.
 - La foto de perfil aún no se ve en las tarjetas del feed, en Mensajes ni en los resultados de búsqueda de personas.
+
+## 12. Publicar, ubicación y cámara (actualizado 2026-10-07)
+
+**Flujo de publicar una reseña (sin fricción):** el **+** abre la galería directo; al elegir, la foto queda a pantalla completa y se avanza por pasos: 1) título (+ categoría), 2) tu recomendación (opcional), 3) mapa para elegir el lugar (**obligatorio**; el botón del mapa dice "Publicar"), 4) subida con progreso y reintento. Código en `components/ReviewFlow.tsx`.
+**Stories:** "Tu story" abre una cámara propia (`StoryCamera.native.tsx`): foto o video de hasta 30 s (H.264, 4 Mbps), galería abajo a la izquierda, cambiar de cámara abajo a la derecha. Con algo ya elegido se ve a pantalla completa y solo se puede cancelar o publicar. En la web se elige un archivo.
+**Ubicación:** es la del LUGAR que la persona elige en un mapa (OpenStreetMap + búsqueda Nominatim, dentro de un WebView/iframe con Leaflet), no la del teléfono; no se pide permiso de ubicación. Se guarda en `posts.lat` y `posts.lng` con 6 decimales.
+- Migraciones nuevas, aplicadas **solo en pruebas**: `015_post_location.sql` y `016_post_location_precision.sql` (se aplican en orden; 016 sube la precisión de 2 a 6 decimales). Hay que correrlas en producción, con confirmación del dueño, **antes de publicar**.
+- Dependencias nuevas: `expo-camera`, `react-native-webview` (ya en `package.json`). `app.json` lleva los textos de permisos de cámara y micrófono.
+- Pendiente de privacidad: la ubicación de cada reseña es pública con el resto de sus datos y el aviso de privacidad aún no la menciona; revisar con un abogado antes de publicar. OpenStreetMap/Nominatim tienen límites de uso razonable: para mucho tráfico habrá que pasar a un servicio de pago.
+- El 10% de "cerca de ti" del feed ya tiene dónde apoyarse (hay coordenadas), pero no está programado.
+- Sin probar en iPhone: el mapa dentro del flujo, la cámara propia y la subida de video grabado.
