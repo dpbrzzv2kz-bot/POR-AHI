@@ -1,7 +1,7 @@
 import React from 'react';
 import {View,Text,TextInput,Pressable,StyleSheet} from 'react-native';
 import PeopleSearch from './PeopleSearch';
-import {reviewCategories,reviewFormats} from '../lib/discovery';
+
 import type useDiscovery from '../lib/useDiscovery';
 import type {Review} from '../lib/posts';
 import type {PublicProfile} from '../lib/social';
@@ -9,13 +9,11 @@ import {palette as p} from '../lib/theme';
 import Icon from './Icon';
 
 export default function DiscoverySearch({mode,setMode,search,openPerson,renderReview}:{mode:'Reseñas'|'Personas';setMode:(mode:'Reseñas'|'Personas')=>void;search:ReturnType<typeof useDiscovery>;openPerson:(person:PublicProfile)=>void;renderReview:(review:Review)=>React.ReactNode}){
- return <View><View style={s.box}><Text style={s.kicker}>DESCUBRE</Text><Text style={s.title}>Tu próximo plan{ '\n' }empieza por aquí.</Text><View style={s.modeRow}>{(['Reseñas','Personas'] as const).map(item=><Pressable key={item} accessibilityRole="button" accessibilityLabel={'Buscar '+item.toLowerCase()} accessibilityState={{selected:mode===item}} onPress={()=>setMode(item)} style={[s.mode,mode===item&&s.selected]}><Icon name={item==='Reseñas'?'search':'profile'} size={19} color={mode===item?p.onDark:p.muted}/><Text style={[s.label,mode===item&&s.selectedText]}>{item}</Text></Pressable>)}</View></View>
+ return <View><View style={s.box}><View style={s.modeRow}>{(['Reseñas','Personas'] as const).map(item=><Pressable key={item} accessibilityRole="button" accessibilityLabel={'Buscar '+item.toLowerCase()} accessibilityState={{selected:mode===item}} onPress={()=>setMode(item)} style={[s.mode,mode===item&&s.selected]}><Icon name={item==='Reseñas'?'search':'profile'} size={19} color={mode===item?p.onDark:p.muted}/><Text style={[s.label,mode===item&&s.selectedText]}>{item}</Text></Pressable>)}</View></View>
  {mode==='Personas'?<PeopleSearch open={openPerson}/>:<>
- <View style={s.box}><View style={s.searchField}><Icon name="search" color={p.muted} size={21}/><TextInput accessibilityLabel="Buscar reseñas por lugar" value={search.query} onChangeText={search.setQuery} placeholder="Busca un lugar" placeholderTextColor={p.muted} maxLength={80} autoCapitalize="none" returnKeyType="search" style={s.input}/></View><Text style={s.note}>Lugares recomendados por la comunidad.</Text>
- <Text style={s.filterTitle}>¿Qué te gustaría hacer?</Text><View style={s.choices}>{reviewCategories.map(item=><Pressable key={item} accessibilityRole="button" accessibilityLabel={'Categoría '+item} accessibilityState={{selected:search.category===item}} onPress={()=>search.setCategory(item)} style={[s.chip,search.category===item&&s.selected]}><Text style={[s.label,search.category===item&&s.selectedText]}>{item}</Text></Pressable>)}</View>
- <View style={s.choices}>{reviewFormats.map(item=><Pressable key={item} accessibilityRole="button" accessibilityLabel={'Formato '+item} accessibilityState={{selected:search.format===item}} onPress={()=>search.setFormat(item)} style={[s.format,search.format===item&&s.formatSelected]}><Text style={[s.label,search.format===item&&s.formatText]}>{item}</Text></Pressable>)}</View>
- {!!(search.query||search.category!=='Todas'||search.format!=='Todos')&&<Pressable accessibilityRole="button" onPress={()=>{search.setQuery('');search.setCategory('Todas');search.setFormat('Todos');}} style={s.button}><Text style={s.label}>Limpiar filtros</Text></Pressable>}
- <Text accessibilityLiveRegion="polite" style={s.note}>{search.loading?'Buscando reseñas…':search.error?'':!search.reviews.length?'No encontramos reseñas. Prueba otro lugar o cambia los filtros.':search.reviews.length+(search.reviews.length===1?' reseña mostrada':' reseñas mostradas')+(search.nextOffset!==null?' · hay más resultados':'')}</Text>
+ <View style={s.box}><View style={s.searchField}><Icon name="search" color={p.muted} size={21}/><TextInput accessibilityLabel="Buscar reseñas por lugar" value={search.query} onChangeText={search.setQuery} placeholder="Busca un lugar" placeholderTextColor={p.muted} maxLength={80} autoCapitalize="none" returnKeyType="search" style={s.input}/></View>
+ 
+ {(search.loading||(!search.error&&!search.reviews.length))&&<Text accessibilityLiveRegion="polite" style={s.note}>{search.loading?'Buscando reseñas…':'No encontramos reseñas. Prueba con otro lugar.'}</Text>}
  {!!search.error&&<><Text accessibilityRole="alert" style={s.error}>{search.error}</Text><Pressable accessibilityRole="button" onPress={search.retry} style={s.button}><Text style={s.label}>Reintentar búsqueda</Text></Pressable></>}
  </View>{search.reviews.map(renderReview)}
  {search.nextOffset!==null&&!search.error&&<View style={s.box}><Pressable accessibilityRole="button" disabled={search.loading} onPress={search.more} style={s.button}><Text style={s.label}>{search.loading?'Cargando…':'Ver más reseñas'}</Text></Pressable></View>}

@@ -4,6 +4,7 @@ import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 import {Link,router} from 'expo-router';
 import {googleSignInEnabled,startGoogleSignIn} from '../lib/googleSignIn';
+import {signInWithGoogleNative} from '../lib/nativeGoogleSignIn';
 import {createAuthFetch} from '../lib/authFetch';
 import {legalReady} from '../lib/legalContent';
 import {palette as p} from '../lib/theme';
@@ -12,7 +13,8 @@ import ui from '../lib/uiStyles';
 const googleStyles=StyleSheet.create({button:{backgroundColor:p.surface,borderRadius:14,minHeight:48,padding:15,marginTop:12,alignItems:'center',borderWidth:1,borderColor:p.line},text:{color:p.ink,fontWeight:'700'}});
 
 export type Profile={display_name:string;username:string|null;bio:string};
-export default function Account({onProfileChange}:{onProfileChange:(profile:Profile|null)=>void}){
+export type ProfileStatus='loading'|'incomplete'|'complete';
+export default function Account({onProfileChange,onProfileStatus,onboarding=false,settings=false}:{onProfileChange:(profile:Profile|null)=>void;onProfileStatus?:(status:ProfileStatus)=>void;onboarding?:boolean;settings?:boolean}){
  const [session,setSession]=useState<Session|null>(null),[loading,setLoading]=useState(true);
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[signup,setSignup]=useState(false);
  const [name,setName]=useState(''),[username,setUsername]=useState(''),[bio,setBio]=useState('');
@@ -21,10 +23,10 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  const [googleEnabled,setGoogleEnabled]=useState(false),[googleRetry,setGoogleRetry]=useState(false),[providerAttempt,setProviderAttempt]=useState(0);
  const googleLock=useRef(false);
  const [editingUser,setEditingUser]=useState<string|null>(null);
- const editing=!!session&&editingUser===session.user.id;
+ const editing=!!session&&(settings||editingUser===session.user.id);
  useEffect(()=>{
   const url=process.env.EXPO_PUBLIC_SUPABASE_URL,key=process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if(Platform.OS!=='web'||!url||!key||session)return;
+  if(!url||!key||session)return;
   let active=true;const controller=new AbortController();
   googleSignInEnabled(url,key,createAuthFetch(),controller.signal).then(enabled=>{if(active){setGoogleEnabled(enabled);setGoogleRetry(false);}}).catch(()=>{if(active){setGoogleEnabled(false);setGoogleRetry(true);}});
   return()=>{active=false;controller.abort();};
@@ -38,21 +40,21 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
  },[]);
  useEffect(()=>{
   let active=true;const controller=new AbortController();
-  setProfileReady(false);setProfileLoading(!!session);setNotice('');onProfileChange(null);
+  setProfileReady(false);setProfileLoading(!!session);setNotice('');onProfileChange(null);onProfileStatus?.('loading');
   if(session&&supabase){
    const timer=setTimeout(()=>controller.abort(),15000);
    (async()=>{try{
     const {data,error}=await supabase!.from('profiles').select('display_name,username,bio').eq('id',session.user.id).abortSignal(controller.signal).maybeSingle();
     if(!active)return;
     if(error)throw error;
-    setName(data?.display_name||'');setUsername(data?.username||'');setBio(data?.bio||'');setProfileReady(true);onProfileChange(data);
+    setName(data?.display_name||'');setUsername(data?.username||'');setBio(data?.bio||'');setProfileReady(true);onProfileChange(data);onProfileStatus?.(data?.display_name&&data?.username?'complete':'incomplete');
    }catch{if(active)setNotice('No se pudo cargar tu perfil. Pulsa Reintentar carga.');}
    finally{clearTimeout(timer);if(active)setProfileLoading(false);}})();
    return()=>{active=false;clearTimeout(timer);controller.abort();};
   }
   setName('');setUsername('');setBio('');
   return()=>{active=false;controller.abort();};
- },[session,loadAttempt,onProfileChange]);
+ },[session,loadAttempt,onProfileChange,onProfileStatus]);
  const action=async()=>{
   if(!supabase)return;
   setNotice('');
@@ -65,9 +67,12 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
   }catch{setNotice('No hay conexión. Intenta de nuevo.');}finally{setBusy(false);}
  };
  const google=async()=>{
-  if(!supabase||googleLock.current||!googleEnabled||Platform.OS!=='web')return;
+  if(!supabase||googleLock.current||!googleEnabled)return;
   googleLock.current=true;setBusy(true);setNotice('');setPassword('');
-  try{const destination=await startGoogleSignIn(supabase.auth,process.env.EXPO_PUBLIC_SUPABASE_URL!);window.location.assign(destination);}
+  try{
+   if(Platform.OS==='web'){const destination=await startGoogleSignIn(supabase.auth,process.env.EXPO_PUBLIC_SUPABASE_URL!);window.location.assign(destination);}
+   else await signInWithGoogleNative(supabase.auth,process.env.EXPO_PUBLIC_SUPABASE_URL!);
+  }
   catch(error){setNotice(error instanceof Error?error.message:'No se pudo abrir Google.');}
   finally{googleLock.current=false;setBusy(false);}
  };
@@ -81,26 +86,34 @@ export default function Account({onProfileChange}:{onProfileChange:(profile:Prof
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
   try{const {data,error}=await supabase.from('profiles').upsert({id:session.user.id,display_name:name.trim(),username:normalizedUsername,bio:bio.trim()},{onConflict:'id'}).select('display_name,username,bio').abortSignal(controller.signal).single();
    if(error){setNotice(error.code==='23505'?'Ese usuario ya está ocupado. Elige otro.':error.code==='42501'?'Tu sesión no tiene acceso. Cierra sesión y vuelve a entrar.':'No se pudo guardar. Reintenta; si continúa, cierra sesión y vuelve a entrar.');}
-   else if(data){setName(data.display_name);setUsername(data.username);setBio(data.bio);onProfileChange(data);setNotice('Perfil guardado en tu cuenta.');}
+   else if(data){setName(data.display_name);setUsername(data.username);setBio(data.bio);onProfileChange(data);onProfileStatus?.('complete');setNotice('Perfil guardado en tu cuenta.');}
   }catch{setNotice('La conexión tardó demasiado o no está disponible. Vuelve a intentar guardar.');}finally{clearTimeout(timer);setBusy(false);}
  };
  const button=(text:string,onPress:()=>void,disabled=false,primary=false)=><Pressable accessibilityRole="button" disabled={disabled||busy} onPress={onPress} style={[primary?ui.button:ui.secondary,(disabled||busy)&&{opacity:.5}]}><Text style={ui.buttonText}>{text}</Text></Pressable>;
  if(!supabase)return <Text style={styles.note}>La conexión de cuentas aún no está configurada.</Text>;
  if(loading)return <Text style={styles.note}>Cargando tu cuenta…</Text>;
- if(session&&!editing)return <View style={styles.collapsed}><View style={{flex:1,minWidth:0}}><Text style={styles.accountLabel}>TU CUENTA</Text><Text style={styles.compactNote}>Nombre, @usuario y biografía</Text></View><Pressable accessibilityRole="button" disabled={busy} onPress={()=>setEditingUser(session.user.id)} style={styles.editButton}><Text style={styles.editText}>Editar perfil</Text></Pressable></View>;
+ if(session&&onboarding)return <View style={styles.box}><Text style={styles.accountLabel}>PASO 1</Text><Text style={styles.title}>Elige cómo te van a ver.</Text><Text style={styles.note}>Solo necesitamos un nombre y un usuario para empezar.</Text>
+ <Text style={styles.label}>Nombre</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Tu nombre" value={name} onChangeText={setName} maxLength={80} placeholder="Cómo te llamas" placeholderTextColor={p.muted} style={styles.input}/>
+ <Text style={styles.label}>@usuario</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Tu usuario" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={25} placeholder="daniel_perez" placeholderTextColor={p.muted} style={styles.input}/>
+ <Text style={styles.note}>De 3 a 24 letras, números o guion bajo, sin espacios.</Text>
+ {!!notice&&<Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.feedback}>{notice}</Text>}
+ {button(profileLoading?'Cargando…':busy?'Guardando…':'Continuar',save,profileLoading,true)}
+ {!profileReady&&!profileLoading&&button('Reintentar carga',()=>setLoadAttempt(n=>n+1))}
+ {button('Cerrar sesión',async()=>{setBusy(true);try{const {error}=await supabase!.auth.signOut();if(error)setNotice('No se pudo cerrar la sesión. Intenta de nuevo.');}catch{setNotice('No hay conexión.');}finally{setBusy(false);}})}
+ </View>;
+ if(session&&!editing)return <View style={styles.collapsed}><View style={{flex:1,minWidth:0}}><Text style={styles.accountLabel}>TU CUENTA</Text><Text style={styles.compactNote}>Nombre y @usuario</Text></View><Pressable accessibilityRole="button" disabled={busy} onPress={()=>setEditingUser(session.user.id)} style={styles.editButton}><Text style={styles.editText}>Editar perfil</Text></Pressable></View>;
  return <View style={styles.box}><Text style={styles.accountLabel}>{session?'TU CUENTA':'ÚNETE AL PLAN'}</Text><Text style={styles.title}>{session?'Editar perfil':signup?'Crea tu cuenta':'Entra a tu cuenta'}</Text>
  {session?<><Text style={styles.note}>Tu perfil se guarda en la nube. Las reseñas y stories se guardan en la nube; los mensajes de texto son privados entre ambas cuentas.</Text>
  <Text style={styles.label}>Nombre</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Nombre del perfil" value={name} onChangeText={setName} maxLength={80} style={styles.input}/>
  <Text style={styles.label}>@usuario</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Usuario del perfil" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={25} style={styles.input}/>
- <Text style={styles.label}>Sobre ti</Text><TextInput editable={profileReady&&!busy} accessibilityLabel="Biografía del perfil" value={bio} onChangeText={setBio} multiline maxLength={300} style={styles.input}/>
  <Text style={styles.note}>Puedes escribir el usuario con @ y mayúsculas; lo guardaremos en minúsculas.</Text>
  {!!notice&&<Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.feedback}>{notice}</Text>}
  {button(profileLoading?'Cargando perfil…':busy?'Guardando…':'Guardar perfil',save,profileLoading,true)}
  {!profileReady&&!profileLoading&&button('Reintentar carga',()=>setLoadAttempt(n=>n+1))}
  {button('Cerrar sesión',async()=>{setBusy(true);try{const {error}=await supabase!.auth.signOut();if(error)setNotice('No se pudo cerrar la sesión. Intenta de nuevo.');}catch{setNotice('No hay conexión.');}finally{setBusy(false);}})}
- <Pressable accessibilityRole="button" disabled={busy} onPress={()=>setEditingUser(null)} style={styles.secondary}><Text style={styles.secondaryText}>Cerrar edición del perfil</Text></Pressable>
+ {!settings&&<Pressable accessibilityRole="button" disabled={busy} onPress={()=>setEditingUser(null)} style={styles.secondary}><Text style={styles.secondaryText}>Cerrar edición del perfil</Text></Pressable>}
  {legalReady&&<Link href="/delete-account" style={styles.legal}>Eliminar cuenta</Link>}
- </>:<><Text style={styles.note}>Puedes explorar sin cuenta. Regístrate para guardar tu perfil.</Text>
+ </>:<><Text style={styles.note}>Necesitas una cuenta para entrar. Regístrate gratis en un minuto.</Text>
  {googleEnabled&&<><Pressable accessibilityRole="button" disabled={busy} onPress={google} style={[googleStyles.button,busy&&{opacity:.5}]}><Text style={googleStyles.text}>Continuar con Google</Text></Pressable><Text style={styles.note}>Usa la misma cuenta de Google cada vez. Si ya tienes una cuenta aquí, utiliza el mismo correo para conservar tu perfil.</Text><Text style={styles.label}>O entra con tu correo</Text></>}
  {googleRetry&&button('Reintentar opciones de acceso',()=>setProviderAttempt(n=>n+1))}
  <Text style={styles.label}>Correo</Text><TextInput accessibilityLabel="Correo de la cuenta" value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" style={styles.input}/>

@@ -4,8 +4,8 @@ import {searchReviews,type ReviewCategory,type ReviewFormat} from './discovery';
 import type {Review} from './posts';
 
 type Results={key:string;reviews:Review[];nextOffset:number|null;loading:boolean;error:string};
-export default function useDiscovery(userId:string|null,version:number,enabled:boolean){
- const [query,setQuery]=useState(''),[category,setCategory]=useState<ReviewCategory>('Todas'),[format,setFormat]=useState<ReviewFormat>('Todos');
+export default function useDiscovery(userId:string|null,version:number,enabled:boolean,category:ReviewCategory='Todas'){
+ const [query,setQuery]=useState(''),[format,setFormat]=useState<ReviewFormat>('Todos');
  const [page,setPage]=useState({key:'',offset:0}),[attempt,setAttempt]=useState(0);
  const [results,setResults]=useState<Results>({key:'',reviews:[],nextOffset:null,loading:false,error:''});
  const key=JSON.stringify([query,category,format,userId,version,enabled]);
@@ -30,5 +30,5 @@ export default function useDiscovery(userId:string|null,version:number,enabled:b
   return()=>{active=false;clearTimeout(timer);clearTimeout(deadline);controller.abort();};
  },[key,query,category,format,offset,attempt,enabled]);
  const current=enabled&&results.key===key?results:{key,reviews:[],nextOffset:null,loading:enabled,error:''};
- return {...current,query,setQuery,category,setCategory,format,setFormat,retry:()=>setAttempt(n=>n+1),more:()=>{if(!current.loading&&!current.error&&current.nextOffset!==null)setPage({key,offset:current.nextOffset});}};
+ return {...current,query,setQuery,category,format,setFormat,retry:()=>setAttempt(n=>n+1),more:()=>{if(!current.loading&&!current.error&&current.nextOffset!==null)setPage({key,offset:current.nextOffset});}};
 }
