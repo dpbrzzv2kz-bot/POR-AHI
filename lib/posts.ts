@@ -150,3 +150,13 @@ async function publishPostMany(items:Media[],pathToken:string,fields:Record<stri
  const saved=await waitForOperation(supabase.from('post_media').upsert(rest,{onConflict:'media_path',ignoreDuplicates:true}),options.signal);
  if(saved.error)throw new Error('La publicación se creó, pero faltó guardar todas las fotos y videos. Pulsa Reintentar publicación.');
 }
+
+// Ubicaciones de las reseñas de una persona (lat/lng ya son públicas con cada reseña). Alimentan el mapa de estados del perfil.
+export async function loadVisitedPoints(userId:string,signal?:AbortSignal):Promise<{lat:number;lng:number}[]>{
+ if(!supabase)throw new Error('La conexión todavía no está configurada.');
+ let request=supabase.from('posts').select('lat,lng').eq('user_id',userId).eq('is_short',false).not('lat','is',null).not('lng','is',null).limit(500);
+ if(signal)request=request.abortSignal(signal);
+ const {data,error}=await request;
+ if(error)throw new Error('No se pudo cargar el mapa de estados.');
+ return (data||[]).map(row=>({lat:Number(row.lat),lng:Number(row.lng)})).filter(point=>Number.isFinite(point.lat)&&Number.isFinite(point.lng)&&Math.abs(point.lat)<=90&&Math.abs(point.lng)<=180);
+}
