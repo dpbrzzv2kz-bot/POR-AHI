@@ -47,7 +47,8 @@ export async function mediaSource(media: Media) {
     fileReader: {async openFile() {
       return {size: file.size, async slice(start: number, end: number) {
         const handle = file.open(FileMode.ReadOnly);
-        try {handle.offset = start; return {value: handle.readBytes(Math.min(end, file.size) - start), done: end >= file.size};}
+        // tus-js-client mide cada trozo con `.size`; los bytes nativos solo traen `.length`.
+        try {handle.offset = start; const bytes = handle.readBytes(Math.min(end, file.size) - start); return {value: Object.defineProperty(bytes, 'size', {value: bytes.byteLength}), done: end >= file.size};}
         finally {handle.close();}
       }, close() {} }; // Each chunk closes its native handle, including failures/pauses.
     }},
