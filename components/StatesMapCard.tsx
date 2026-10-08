@@ -50,7 +50,7 @@ export default function StatesMapCard({userId,own,person,refreshKey=0}:{userId:s
     {!!result?.countries.length&&<ScrollView style={s.list} contentContainerStyle={{paddingHorizontal:16,paddingVertical:12,gap:12}}>
      {result.countries.map(item=><View key={item.a}>
       <View style={s.row}><Text style={s.country}>{country(item.a)}</Text><Text style={s.rowCount}>{item.v} / {item.t}</Text></View>
-      <View style={s.track}><View style={[s.fill,{width:Math.max(3,Math.min(100,item.v/Math.max(1,item.t)*100))+'%'}]}/></View>
+      <View style={s.track}><View style={[s.fill,{width:(Math.max(3,Math.min(100,item.v/Math.max(1,item.t)*100))+'%') as `${number}%`}]}/></View>
       <Text style={s.names}>{item.names.map(state).join(' · ')}</Text>
      </View>)}
     </ScrollView>}

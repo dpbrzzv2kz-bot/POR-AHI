@@ -36,9 +36,9 @@ function put(lat,lng,label,address){
   lat=Math.round(lat*1e6)/1e6;lng=Math.round(lng*1e6)/1e6;
   if(marker){marker.setLatLng([lat,lng]);}
   else{marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.on('dragend',function(){var p=marker.getLatLng();put(p.lat,p.lng,'');});}
+  var token=++geoToken;
   send({lat:lat,lng:lng,label:label||'',address:address||''});
   if(!address){
-    var token=++geoToken;
     fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat='+lat+'&lon='+lng)
       .then(function(r){return r.json();})
       .then(function(d){if(token!==geoToken||!d||!d.display_name)return;send({lat:lat,lng:lng,label:label||'',address:String(d.display_name)});})
