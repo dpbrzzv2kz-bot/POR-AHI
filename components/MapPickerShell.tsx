@@ -13,14 +13,14 @@ export default function MapPickerShell({initial,onCancel,onConfirm,surface,confi
  const onRaw=useCallback((raw:string)=>{
   try{
    const m=JSON.parse(raw);
-   if(Number.isFinite(m.lat)&&Number.isFinite(m.lng)&&Math.abs(m.lat)<=90&&Math.abs(m.lng)<=180)setPicked({lat:m.lat,lng:m.lng,label:typeof m.label==='string'?m.label.slice(0,80):''});
+   if(Number.isFinite(m.lat)&&Number.isFinite(m.lng)&&Math.abs(m.lat)<=90&&Math.abs(m.lng)<=180)setPicked({lat:m.lat,lng:m.lng,label:typeof m.label==='string'?m.label.slice(0,80):'',address:typeof m.address==='string'?m.address.slice(0,300):''});
   }catch{/* Mensaje que no es del mapa. */}
  },[]);
  return <View style={s.screen}>
   <View style={s.header}><Text style={s.title}>Elige el lugar</Text><Pressable accessibilityRole="button" accessibilityLabel={cancelLabel} onPress={onCancel} style={s.cancel}><View style={{transform:[{rotate:'45deg'}]}}><Icon name="plus" size={20}/></View><Text style={s.cancelText}>{cancelLabel}</Text></Pressable></View>
   <View style={{flex:1}}>{surface({html,onRaw})}</View>
   <View style={s.footer}>
-   <Text numberOfLines={2} style={s.note}>{picked?(picked.label||'Lugar elegido en el mapa. Puedes arrastrar el pin.'):'Busca un lugar por nombre o toca el mapa para poner el pin.'}</Text>
+   <Text numberOfLines={2} style={s.note}>{picked?(picked.address||picked.label||'Lugar elegido en el mapa. Puedes arrastrar el pin.'):'Busca un lugar por nombre o toca el mapa para poner el pin.'}</Text>
    <Pressable accessibilityRole="button" accessibilityLabel={confirmLabel} disabled={!picked} onPress={()=>{if(picked)onConfirm(picked);}} style={[s.confirm,!picked&&{opacity:.4}]}><Text style={s.confirmText}>{confirmLabel}</Text></Pressable>
   </View>
  </View>;

@@ -1,14 +1,14 @@
 // Mapa para elegir el lugar de una reseña. Se muestra dentro de un WebView (iPhone/Android) o un iframe (web).
 // Usa OpenStreetMap (mapa) y Nominatim (búsqueda por nombre): gratis, sin llaves, con límites de uso razonable.
-export type PickedPlace = {lat: number; lng: number; label: string};
+export type PickedPlace = {lat: number; lng: number; label: string; address?: string};
 
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 
 export function mapHtml(initial?: PickedPlace | null) {
   const start = initial
-    ? {lat: initial.lat, lng: initial.lng, zoom: 16, pin: true, label: initial.label}
-    : {lat: 25.6866, lng: -100.3161, zoom: 12, pin: false, label: ''}; // Monterrey, sin pin
+    ? {lat: initial.lat, lng: initial.lng, zoom: 16, pin: true, label: initial.label, address: initial.address || ''}
+    : {lat: 25.6866, lng: -100.3161, zoom: 12, pin: false, label: '', address: ''}; // Monterrey, sin pin
   const startJson = JSON.stringify(start).replace(/</g, '\\u003c');
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="stylesheet" href="${LEAFLET_CSS}" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -31,14 +31,22 @@ L.control.zoom({position:'bottomright'}).addTo(map);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
 var marker=null;
 function send(o){var m=JSON.stringify(o);if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(m);else window.parent.postMessage(m,'*');}
-function put(lat,lng,label){
+var geoToken=0;
+function put(lat,lng,label,address){
   lat=Math.round(lat*1e6)/1e6;lng=Math.round(lng*1e6)/1e6;
   if(marker){marker.setLatLng([lat,lng]);}
   else{marker=L.marker([lat,lng],{draggable:true}).addTo(map);marker.on('dragend',function(){var p=marker.getLatLng();put(p.lat,p.lng,'');});}
-  send({lat:lat,lng:lng,label:label||''});
+  send({lat:lat,lng:lng,label:label||'',address:address||''});
+  if(!address){
+    var token=++geoToken;
+    fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat='+lat+'&lon='+lng)
+      .then(function(r){return r.json();})
+      .then(function(d){if(token!==geoToken||!d||!d.display_name)return;send({lat:lat,lng:lng,label:label||'',address:String(d.display_name)});})
+      .catch(function(){});
+  }
 }
 map.on('click',function(e){document.getElementById('res').style.display='none';put(e.latlng.lat,e.latlng.lng,'');});
-if(start.pin){put(start.lat,start.lng,start.label);}
+if(start.pin){put(start.lat,start.lng,start.label,start.address);}
 function show(text){var box=document.getElementById('res');box.innerHTML='';var b=document.createElement('button');b.disabled=true;b.textContent=text;box.appendChild(b);box.style.display='block';}
 function search(){
   var q=document.getElementById('q').value.trim();if(!q)return;
@@ -50,7 +58,7 @@ function search(){
       if(!rows.length){show('Sin resultados. Prueba con otro nombre o toca el mapa.');return;}
       rows.forEach(function(row){
         var b=document.createElement('button');b.textContent=row.display_name;
-        b.onclick=function(){box.style.display='none';map.setView([+row.lat,+row.lon],17);put(+row.lat,+row.lon,String(row.display_name).split(',')[0]);};
+        b.onclick=function(){box.style.display='none';map.setView([+row.lat,+row.lon],17);put(+row.lat,+row.lon,String(row.display_name).split(',')[0],String(row.display_name));};
         box.appendChild(b);
       });
       box.style.display='block';
