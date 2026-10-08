@@ -172,4 +172,4 @@ Una reseña puede tener hasta 10 archivos (fotos y videos mezclados). La primera
 - La subida (`publishPostMany` en `lib/posts.ts`) es reintentable: cada archivo se sube una vez, la publicación se crea una vez y los extras se guardan sin duplicar. Si `post_media` no existe o falla, el feed muestra solo la portada.
 - **Sin probar:** borrar una publicación con varios archivos (comprobar que no queden archivos en Storage), y la subida desde iPhone.
 - Pendientes: el panel de moderación solo muestra la portada como vista previa; no hay tope de peso total por publicación (10 videos de 50 MB = 500 MB); la selección no se puede editar después de elegirla.
-- Orden de migraciones para producción: 013, 014, 015, 016, 017.
+- Orden de migraciones para producción: 013, 014, 015, 016, 017 (y 018, que es inofensiva allí porque 017 ya trae su corrección). 018 existe solo porque la primera versión de 017, aplicada en pruebas, tenía una recursión infinita en la política de post_media. Verificado en pruebas el 2026-10-07: se guardan portada y extras.
