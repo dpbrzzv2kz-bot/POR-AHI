@@ -77,9 +77,10 @@ export async function deleteOwnContent(client:SupabaseClient,userId:string,targe
   const begun=await rpc('begin');
   if(begun?.deleted===true){onWithdrawn?.();return;}
   const path=validateContentFile(begun?.file,userId);
+  const extras:string[]=Array.isArray(begun?.files)?begun.files.slice(0,10).map((file:unknown)=>validateContentFile(file,userId)):[];
   if(begun.pending!==true)throw new Error('No se pudo confirmar la eliminación.');
   onWithdrawn?.();
-  const {error}=await fixed.storage.from('review-media').remove([path]);
+  const {error}=await fixed.storage.from('review-media').remove([path,...extras]);
   if(error)throw contentError(error);
   // SQL verifies actual Storage absence before committing cascades. A successful
   // HTTP delete alone is insufficient, and every step can safely be retried.

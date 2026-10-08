@@ -4,7 +4,7 @@ import {uploadInChunks, checkSignal, waitForOperation, type UploadProgress} from
 import {hydrateReviews} from './reviewMedia';
 
 export type Media={uri:string;type:'image'|'video';mimeType?:string;fileName?:string;file?:File;size?:number;duration?:number};
-export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number};
+export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number;items?:Media[]};
 export type Story={id:string;userId:string;name:string;expires:number;media?:Media;color:string};
 const bucket='review-media';
 type PublishOptions={signal?:AbortSignal;progress?:(value:UploadProgress)=>void};
@@ -35,8 +35,11 @@ export async function loadStories():Promise<Story[]>{
  }));
  return result.flat();
 }
-export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={},location?:{lat:number;lng:number}|null){
- return publishVisual(media,pathToken,'posts',{category,place:place.trim(),description:text.trim(),...(location?{lat:location.lat,lng:location.lng}:{})},options);
+export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={},location?:{lat:number;lng:number}|null,extras:Media[]=[]){
+ const fields={category,place:place.trim(),description:text.trim(),...(location?{lat:location.lat,lng:location.lng}:{})};
+ if(extras.length>9)throw new Error('Una publicación puede tener hasta 10 fotos o videos.');
+ if(extras.length)return publishPostMany([media,...extras],pathToken,fields,options);
+ return publishVisual(media,pathToken,'posts',fields,options);
 }
 export async function publishStory(media:Media,pathToken:string,options:PublishOptions={}){
  return publishVisual(media,pathToken,'stories',{},options);
@@ -85,4 +88,64 @@ async function publishVisual(media:Media,pathToken:string,table:'posts'|'stories
   const check=await waitForOperation(supabase.from(table).select('id').eq('media_path',path).maybeSingle(),options.signal);
   if(!check.data)throw new Error('No se pudo confirmar la publicación. Vuelve a intentar; tu archivo elegido se conservará.');
  }
+}
+
+// Sube un archivo solo si no está ya en Storage (un reintento no lo repite) y valida que sea el mismo.
+async function uploadIfMissing(input:{media:Media;path:string;size:number;mime:string;userId:string;options:PublishOptions;progress:(value:UploadProgress)=>void}){
+ const storage=supabase!.storage.from(bucket);
+ const completed=await waitForOperation(storage.info(input.path),input.options.signal);
+ if(completed.error&&completed.error.status!==404&&completed.error.statusCode!=='404'&&!['NoSuchKey','not_found'].includes(completed.error.statusCode||''))
+  throw new Error('No se pudo comprobar la carga. Revisa tu conexión y reintenta.');
+ if(completed.data){
+  if((completed.data.size??completed.data.metadata?.size)!==input.size||(completed.data.contentType??completed.data.metadata?.mimetype)!==input.mime)throw new Error('El archivo de este intento no coincide. Vuelve a elegirlo.');
+  return;
+ }
+ const source=await waitForOperation(mediaSource(input.media),input.options.signal);
+ const host=new URL(process.env.EXPO_PUBLIC_SUPABASE_URL!);
+ if(host.hostname.endsWith('.supabase.co'))host.hostname=host.hostname.replace('.supabase.co','.storage.supabase.co');
+ host.pathname='/storage/v1/upload/resumable';
+ await uploadInChunks({...source,size:input.size,mime:input.mime,path:input.path,endpoint:host.toString(),signal:input.options.signal,progress:input.progress,
+  authorization:async()=>{
+   const {data:{session}}=await supabase!.auth.getSession();
+   if(!session||session.user.id!==input.userId)throw new Error('La sesión cambió. Inicia sesión y publica de nuevo.');
+   return {authorization:`Bearer ${session.access_token}`,apikey:process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!};
+  }});
+}
+// Publicación con varias fotos o videos: la primera es la portada (posts.media_path); el resto va en post_media.
+// Todo es reintentable: cada archivo se sube una sola vez, la publicación se crea una sola vez y los extras se guardan sin duplicar.
+async function publishPostMany(items:Media[],pathToken:string,fields:Record<string,string|number>,options:PublishOptions){
+ if(!supabase)throw new Error('La conexión todavía no está configurada.');
+ checkSignal(options.signal);
+ options.progress?.({phase:'preparing',sent:0,total:items.reduce((n,m)=>n+(m.size||0),0)});
+ const {data:{user},error:authError}=await waitForOperation(supabase.auth.getUser(),options.signal);
+ if(authError||!user)throw new Error('Inicia sesión desde Perfil antes de publicar.');
+ const {data:profile,error:profileError}=await waitForOperation(supabase.from('profiles').select('display_name,username').eq('id',user.id).maybeSingle(),options.signal);
+ if(profileError||!profile?.username||!profile.display_name)throw new Error('Guarda tu nombre y @usuario en Perfil antes de publicar.');
+ const prepared:Media[]=[];
+ for(const item of items){prepared.push(await waitForOperation(prepareMedia(item),options.signal));checkSignal(options.signal);}
+ const total=prepared.reduce((n,m)=>n+m.size!,0);
+ const paths=prepared.map((m,i)=>`${user.id}/posts-${pathToken}${i?'-'+i:''}.${mediaExtension(m.mimeType!)}`);
+ const found=await waitForOperation(supabase.from('posts').select('id').eq('media_path',paths[0]).maybeSingle(),options.signal);
+ if(found.error)throw new Error('No hay conexión con las publicaciones. Intenta de nuevo.');
+ let postId:string|undefined=found.data?.id;
+ let before=0;
+ for(let i=0;i<prepared.length;i++){
+  const size=prepared[i].size!,offset=before;before+=size;
+  if(i===0&&postId)continue; // portada ya publicada en un intento anterior
+  await uploadIfMissing({media:prepared[i],path:paths[i],size,mime:prepared[i].mimeType!,userId:user.id,options,
+   progress:value=>options.progress?.({...value,sent:offset+Math.min(value.sent,size),total,accepted:value.accepted===undefined?undefined:offset+value.accepted})});
+ }
+ checkSignal(options.signal);
+ const {data:{session}}=await waitForOperation(supabase.auth.getSession(),options.signal);
+ if(!session||session.user.id!==user.id)throw new Error('La sesión cambió. Inicia sesión y publica de nuevo.');
+ options.progress?.({phase:'confirming',sent:total,total});
+ if(!postId){
+  const result=await waitForOperation(supabase.from('posts').insert({user_id:user.id,author_name:profile.display_name,...fields,kind:prepared[0].type,media_path:paths[0]}),options.signal);
+  const check=await waitForOperation(supabase.from('posts').select('id').eq('media_path',paths[0]).maybeSingle(),options.signal);
+  if(!check.data)throw new Error(result.error?'No se pudo confirmar la publicación. Vuelve a intentar; tus archivos elegidos se conservarán.':'No se pudo confirmar la publicación. Revisa tu conexión y reintenta.');
+  postId=check.data.id;
+ }
+ const rest=prepared.slice(1).map((m,i)=>({post_id:postId,user_id:user.id,position:i+2,kind:m.type,media_path:paths[i+1]}));
+ const saved=await waitForOperation(supabase.from('post_media').upsert(rest,{onConflict:'media_path',ignoreDuplicates:true}),options.signal);
+ if(saved.error)throw new Error('La publicación se creó, pero faltó guardar todas las fotos y videos. Pulsa Reintentar publicación.');
 }
