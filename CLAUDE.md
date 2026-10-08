@@ -164,3 +164,12 @@ Si se publica la app sin aplicar esas migraciones, los perfiles y los contadores
 - Pendiente de privacidad: la ubicación de cada reseña es pública con el resto de sus datos y el aviso de privacidad aún no la menciona; revisar con un abogado antes de publicar. OpenStreetMap/Nominatim tienen límites de uso razonable: para mucho tráfico habrá que pasar a un servicio de pago.
 - El 10% de "cerca de ti" del feed ya tiene dónde apoyarse (hay coordenadas), pero no está programado.
 - Sin probar en iPhone: el mapa dentro del flujo, la cámara propia y la subida de video grabado.
+
+## 13. Publicaciones con varias fotos y videos (actualizado 2026-10-07)
+
+Una reseña puede tener hasta 10 archivos (fotos y videos mezclados). La primera sigue siendo `posts.media_path` (portada); del 2 al 10 van en `post_media`. En la galería se eligen varias a la vez (el orden de selección es el orden de la publicación) y se deslizan a la derecha con contador "1/5" (`components/MediaPager.tsx`). Las stories siguen siendo de un archivo.
+- Migración `supabase/017_multi_media.sql`: tabla `post_media` con RLS, lectura de archivos extra en Storage, y cambios en tres funciones de seguridad: `reported_media` (moderadores ven los extras), `own_content_file_deleting` y `content_management` (al borrar una publicación se retiran también sus extras; `begin` devuelve `files`). **Aplicada solo en pruebas.** En producción correrla con confirmación del dueño y ANTES de publicar, después de 013 a 016.
+- La subida (`publishPostMany` en `lib/posts.ts`) es reintentable: cada archivo se sube una vez, la publicación se crea una vez y los extras se guardan sin duplicar. Si `post_media` no existe o falla, el feed muestra solo la portada.
+- **Sin probar:** borrar una publicación con varios archivos (comprobar que no queden archivos en Storage), y la subida desde iPhone.
+- Pendientes: el panel de moderación solo muestra la portada como vista previa; no hay tope de peso total por publicación (10 videos de 50 MB = 500 MB); la selección no se puede editar después de elegirla.
+- Orden de migraciones para producción: 013, 014, 015, 016, 017.

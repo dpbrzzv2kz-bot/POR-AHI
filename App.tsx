@@ -37,6 +37,7 @@ import Icon,{type IconName} from './components/Icon';
 import ProfileHeader from './components/ProfileHeader';
 import ScreenHeader from './components/ScreenHeader';
 import StoryCamera from './components/StoryCamera';
+import MediaPager from './components/MediaPager';
 import {avatarUrl} from './lib/avatar';
 
 const seed:Review[] = [
@@ -55,7 +56,7 @@ function MediaCard({review,saved,toggle,open,share,height,liked,like,tomato,onTo
  return <View style={s.mediaCard}>
   <View style={s.cardHeading}><View style={s.authorAvatar}><Text style={s.authorInitial}>{review.author[0]?.toUpperCase()||'↗'}</Text></View><View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={s.cardAuthor}>{review.author}</Text><View style={{alignSelf:'flex-start',backgroundColor:categoryColor(review.category),borderRadius:99,paddingHorizontal:9,paddingVertical:2,marginTop:2}}><Text style={{color:p.ink,fontSize:11,fontWeight:'700'}}>{review.category}</Text></View></View><View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text accessibilityLabel={(counts?.likes??0)+' corazones'} style={{fontSize:13,fontWeight:'800',color:liked?p.violet:p.ink}}>♥ {counts?.likes??'—'}</Text><Text accessibilityLabel={(counts?.tomatoes??0)+' tomates'} style={{fontSize:13,fontWeight:'800',color:tomato?'#D6402B':p.ink}}>🍅 {counts?.tomatoes??'—'}</Text></View></View>
   <View style={[s.mediaArea,{height:Math.max(230,height-85),backgroundColor:review.color}]}>
-  {review.media?.type==='video'?<Video uri={review.media.uri} onEnd={()=>setEnded(true)}/>:review.media?<Image source={{uri:review.media.uri}} style={StyleSheet.absoluteFill} resizeMode="cover"/>:<View style={s.placeholder}><Text style={s.symbol}>{review.symbol}</Text><Text style={s.placeholderText}>ESPACIO PARA FOTO O VIDEO</Text><Text style={s.placeholderText}>MAQUETA · LUGAR FICTICIO</Text></View>}
+  {review.items&&review.items.length>1?<MediaPager items={review.items} renderItem={item=>item.type==='video'?<Video uri={item.uri}/>:<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="cover"/>}/>:review.media?.type==='video'?<Video uri={review.media.uri} onEnd={()=>setEnded(true)}/>:review.media?<Image source={{uri:review.media.uri}} style={StyleSheet.absoluteFill} resizeMode="cover"/>:<View style={s.placeholder}><Text style={s.symbol}>{review.symbol}</Text><Text style={s.placeholderText}>ESPACIO PARA FOTO O VIDEO</Text><Text style={s.placeholderText}>MAQUETA · LUGAR FICTICIO</Text></View>}
   <View style={s.bottomOverlay} {...gesture.panHandlers}><Pressable accessibilityRole="button" accessibilityLabel={'Ver detalles de '+review.place} onPress={open} style={s.detailsButton}><View style={{flex:1,minWidth:0}}><Text numberOfLines={2} style={s.place}>{review.place}</Text><Text style={s.detailsText}>{ended?'¿Vamos? Ver detalles':'Ver detalles · desliza hacia arriba'}</Text></View><View style={s.detailArrow}><Icon name="arrow" size={21}/></View></Pressable></View>
   </View>
   <View style={s.cardActions}><Pressable accessibilityRole="button" accessibilityLabel={liked?'Quitar me gusta':'Me gusta'} disabled={busy} onPress={like} style={s.actionControl}><Icon name="heart" filled={liked} color={liked?p.violet:p.ink}/></Pressable><Pressable accessibilityRole="button" accessibilityLabel={tomato?'Quitar tomate':'Dar tomate: no estoy de acuerdo'} disabled={busy} onPress={onTomato} style={s.actionControl}><Text style={{fontSize:23,opacity:tomato?1:.4}}>🍅</Text></Pressable><View style={{flex:1}}/>{review.cloud&&<Pressable accessibilityRole="button" accessibilityLabel={'Compartir reseña de '+review.place} onPress={share} style={s.actionControl}><Icon name="arrow" size={23}/></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={saved?'Quitar de pendientes':'Guardar en pendientes'} disabled={busy} onPress={toggle} style={s.actionControl}><Icon name="bookmark" filled={saved} color={saved?p.violet:p.ink}/></Pressable></View>
@@ -76,6 +77,7 @@ export default function App(){
  const [settingsOpen,setSettingsOpen]=useState(false);
  const [location,setLocation]=useState<PickedPlace|null>(null);
  const [cameraOpen,setCameraOpen]=useState(false);
+ const [extras,setExtras]=useState<Media[]>([]);
  const [profileStatus,setProfileStatus]=useState<ProfileStatus>('loading');
  const onProfileStatus=React.useCallback((status:ProfileStatus)=>setProfileStatus(previous=>status==='loading'&&previous==='complete'?previous:status),[]);
  const accent=focus==='Todo'?p.lime:categoryColors[focus];
@@ -151,7 +153,7 @@ export default function App(){
  const tomatoReact=(r:Review)=>interactions.change(r.id,'tomato',!!r.cloud);
  const follow=async(id:string)=>{if(followBusy)return;setSocialError('');if(!userId){setSocialError('Inicia sesión desde tu Perfil para seguir personas.');return;}if(!followingReady){setSocialError('Primero vuelve a cargar tu seguimiento.');return;}const generation=socialGeneration.current;setFollowBusy(true);try{await changeFollow(userId,id,!following.includes(id));const ids=await loadFollowing(userId);if(generation===socialGeneration.current)setFollowing(ids);}catch(e){if(generation===socialGeneration.current)setSocialError(e instanceof Error?e.message:'No se pudo cambiar el seguimiento.');}finally{if(generation===socialGeneration.current)setFollowBusy(false);}};
  const button=(label:string,fn:()=>void,disabled=false)=><Pressable accessibilityRole="button" disabled={disabled} onPress={fn} style={[s.button,disabled&&{opacity:.5}]}><Text style={s.buttonText}>{label}</Text></Pressable>;
- const choose=async(source:'library'|'camera'):Promise<'ok'|'cancel'|'error'>=>{
+ const choose=async(source:'library'|'camera',multiple=false):Promise<'ok'|'cancel'|'error'>=>{
   if(busy||publishLock.current)return 'cancel';
   const generation=++pickGeneration.current;setError('');
   // A web picker may not report Cancel; avoid locking the form while it is open.
@@ -161,13 +163,18 @@ export default function App(){
    // Cámara: calidad media y 30 s para no pasar el límite de 50 MB de los videos.
    const result=source==='camera'
     ?await ImagePicker.launchCameraAsync({mediaTypes:['images','videos'],allowsEditing:false,quality:.85,videoMaxDuration:30,videoQuality:ImagePicker.UIImagePickerControllerQualityType.Medium})
-    :await ImagePicker.launchImageLibraryAsync({mediaTypes:['images','videos'],allowsEditing:false,quality:.85});
+    :await ImagePicker.launchImageLibraryAsync({mediaTypes:['images','videos'],allowsEditing:false,quality:.85,...(multiple?{allowsMultipleSelection:true,selectionLimit:10,orderedSelection:true}:{})});
    if(generation!==pickGeneration.current||result.canceled)return 'cancel';
-   const a=result.assets[0];if(a.type!=='image'&&a.type!=='video')throw new Error('Selecciona una foto o video.');
+   const assets=result.assets.slice(0,multiple?10:1);if(assets.some(a=>a.type!=='image'&&a.type!=='video'))throw new Error('Selecciona fotos o videos.');
    setBusy(true);
-   const chosen=await prepareMedia({uri:a.uri,type:a.type,mimeType:a.mimeType,fileName:a.fileName||undefined,file:a.file,size:a.fileSize,duration:a.duration? a.duration/1000:undefined});
+   const chosenAll:Media[]=[];
+   for(const [n,a] of assets.entries()){
+    try{chosenAll.push(await prepareMedia({uri:a.uri,type:a.type as 'image'|'video',mimeType:a.mimeType,fileName:a.fileName||undefined,file:a.file,size:a.fileSize,duration:a.duration? a.duration/1000:undefined}));}
+    catch(e){throw new Error((assets.length>1?`Archivo ${n+1} de ${assets.length}: `:'')+(e instanceof Error?e.message:'No se pudo abrir el archivo.'));}
+    if(generation!==pickGeneration.current)return 'cancel';
+   }
    if(generation!==pickGeneration.current)return 'cancel';
-   setMedia(chosen);setUploadProgress(null);setRetryPublication(false);uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
+   setMedia(chosenAll[0]);setExtras(chosenAll.slice(1));setUploadProgress(null);setRetryPublication(false);uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
    return 'ok';
   }catch(e){if(generation===pickGeneration.current)setError(e instanceof Error?e.message:'No se pudo abrir el archivo. Prueba otro formato.');return 'error';}
   finally{if(generation===pickGeneration.current)setBusy(false);}
@@ -179,8 +186,8 @@ export default function App(){
   if(busy||publishLock.current)return;
   if(reviewParam!==undefined)router.setParams({review:undefined});
   pickGeneration.current++;uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-  setStoryMode(isStory);setLocation(null);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
-  const outcome=await choose('library');
+  setStoryMode(isStory);setLocation(null);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);setExtras([]);
+  const outcome=await choose('library',!isStory);
   if(outcome!=='cancel')setCompose(true);
  };
  const wait=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
@@ -221,9 +228,9 @@ export default function App(){
   publishLock.current=true;pickGeneration.current++;const controller=new AbortController();uploadController.current=controller;
   setBusy(true);setError('');setRetryPublication(false);
   const options={signal:controller.signal,progress:(value:UploadProgress)=>{if(uploadController.current===controller&&!controller.signal.aborted)setUploadProgress(value);}};
-  try{if(storyMode)await publishStory(media,uploadToken.current,options);else await publishPost(media,place,category,text,uploadToken.current,options,where);
+  try{if(storyMode)await publishStory(media,uploadToken.current,options);else await publishPost(media,place,category,text,uploadToken.current,options,where,extras);
    if(uploadController.current!==controller)return;
-   setCompose(false);setMedia(null);setUploadProgress(null);setTab(storyMode?'Fotos':media.type==='image'?'Fotos':'Videos');setAudience('Para ti');await refresh();
+   setCompose(false);setMedia(null);setExtras([]);setUploadProgress(null);setTab(storyMode?'Fotos':media.type==='image'?'Fotos':'Videos');setAudience('Para ti');await refresh();
   }catch(e){if(uploadController.current===controller){setError(e instanceof UploadPaused?e.message:e instanceof Error?e.message:'No se pudo publicar. Intenta de nuevo.');setRetryPublication(true);setUploadProgress(value=>value?{...value,sent:value.accepted??value.sent,phase:'paused'}:null);}}
   finally{if(uploadController.current===controller){uploadController.current=null;publishLock.current=false;setBusy(false);}}
  };
@@ -270,7 +277,7 @@ export default function App(){
  </ScrollView><View style={s.nav}>{tabs.map(([t,icon])=><Pressable key={t} accessibilityRole="button" accessibilityLabel={'Ir a '+t} accessibilityState={{selected:tab===t}} onPress={()=>{if(reviewParam!==undefined)router.setParams({review:undefined});setTab(t);if(t==='Perfil'){setPerson(null);setActivePerson(null);setShowSaved(false);setCategory('Fotos');}}} style={s.navItem}><View style={[s.navIconBox,tab===t&&s.navIconActive,tab===t&&{backgroundColor:accent}]}><Icon name={icon} size={25} color={tab===t?p.ink:p.darkMuted}/></View></Pressable>)}</View>
  <Modal visible={!!detail} transparent animationType="slide" onRequestClose={()=>setDetail(null)}>{detail&&<ReviewDetails review={detail} saved={saved.includes(detail.id)} busy={interactions.busy} error={interactions.error} close={()=>setDetail(null)} save={()=>toggle(detail)} retry={interactions.retry} share={detail.cloud?()=>openShare(detail):undefined} manage={detail.cloud&&userId&&detail.userId===userId?()=>openContent({kind:'post',id:detail.id,owner:userId,label:detail.place,review:detail}):undefined} report={detail.cloud&&detail.userId!==userId?()=>reportItem({kind:'post',id:detail.id,label:detail.place}):undefined} block={detail.cloud&&detail.userId!==userId&&detail.userId?()=>blockPerson(detail.userId!,detail.author):undefined}>{detail.cloud?<Comments key={detail.id+'-'+userId} postId={detail.id} userId={userId} onChange={interactions.refreshCounts} report={reportItem}/>:<Text style={s.demo}>Los comentarios están disponibles en publicaciones reales.</Text>}</ReviewDetails>}</Modal>
  <Modal visible={noticeOpen} animationType="slide" onRequestClose={()=>setNoticeOpen(false)}><NotificationsPanel userId={userId} rows={notices.rows} unread={notices.unread} loading={notices.loading} busy={notices.busy||noticeBusy} error={noticeError||notices.error} refresh={()=>{setNoticeError('');notices.refresh();}} mark={()=>notices.mark()} open={openNotice} close={()=>setNoticeOpen(false)} login={()=>{setNoticeOpen(false);setPerson(null);setActivePerson(null);setShowSaved(false);setTab('Perfil');}}/></Modal>
- <Modal visible={compose} animationType="slide" onRequestClose={()=>{if(!busy){pickGeneration.current++;setCompose(false);}}}><MediaComposer storyMode={storyMode} location={location} setLocation={setLocation} capture={storyMode&&Platform.OS!=='web'?reshoot:undefined} media={media} busy={busy} place={place} category={category} text={text} error={error} retry={retryPublication} progress={uploadProgress} close={()=>{pickGeneration.current++;setCompose(false);}} pick={pick} publish={publish} pause={()=>uploadController.current?.abort()} setPlace={setPlace} setCategory={setCategory} setText={setText} preview={media?(media.type==='image'?<Image source={{uri:media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={media.uri} contentFit="contain" autoPlay={storyMode}/>):null}/></Modal>
+ <Modal visible={compose} animationType="slide" onRequestClose={()=>{if(!busy){pickGeneration.current++;setCompose(false);}}}><MediaComposer storyMode={storyMode} location={location} setLocation={setLocation} capture={storyMode&&Platform.OS!=='web'?reshoot:undefined} media={media} busy={busy} place={place} category={category} text={text} error={error} retry={retryPublication} progress={uploadProgress} close={()=>{pickGeneration.current++;setCompose(false);}} pick={pick} publish={publish} pause={()=>uploadController.current?.abort()} setPlace={setPlace} setCategory={setCategory} setText={setText} preview={media?(extras.length>0&&!storyMode?<MediaPager items={[media,...extras]} renderItem={item=>item.type==='image'?<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={item.uri} contentFit="contain"/>}/>:media.type==='image'?<Image source={{uri:media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={media.uri} contentFit="contain" autoPlay={storyMode}/>):null}/></Modal>
  <Modal visible={!!story} animationType="fade" onRequestClose={()=>setStory(null)}>{story&&<StoryViewer key={story.id} story={story} avatarUri={avatarUrl(storyAvatars[story.userId])} index={Math.max(0,storyIndex)} total={Math.max(1,storyQueue.length)} onPrev={()=>goStory(-1)} onNext={()=>goStory(1)} autoAdvanceMs={story.media?.type==='image'?6000:undefined} own={!!userId&&story.userId===userId} close={()=>setStory(null)} remove={()=>{if(userId&&story.userId===userId)openContent({kind:'story',id:story.id,owner:userId,label:'Story de '+story.name});}} report={()=>reportItem({kind:'story',id:story.id,label:'Story de '+story.name})} media={story.media?(story.media.type==='image'?<Image source={{uri:story.media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={story.media.uri} contentFit="contain" autoPlay onEnd={()=>goStory(1)}/>):null}/>}</Modal>
  <Modal visible={!!shareReview} animationType="slide" onRequestClose={()=>setShareReview(null)}>{shareReview&&<ShareReview key={shareReview.id+'-'+userId} review={shareReview} close={()=>setShareReview(null)}/>}</Modal>
  <Modal visible={!!contentAction&&contentAction.owner===userId} animationType="slide" onRequestClose={()=>{if(!contentBusy)closeContent();}}>{contentAction&&contentAction.owner===userId&&<ContentEditor key={contentAction.kind+contentAction.id+'-'+userId} action={contentAction} close={closeContent} changed={contentChanged} withdrawn={contentWithdrawn} done={()=>{interactions.retry();notices.refresh();refresh();}} busyChange={setContentBusy}/>}</Modal>
