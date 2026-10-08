@@ -195,3 +195,11 @@ Una reseña puede tener hasta 10 archivos (fotos y videos mezclados). La primera
 - En el mapa, el botón Publicar espera hasta 4.5 s a que llegue la dirección (la geocodificación inversa tarda ~1 s); antes una reseña publicada de inmediato quedaba sin dirección.
 
 **Orden de migraciones para producción (todas con confirmación del dueño, antes de publicar):** 013, 014, 015, 016, 017 (018 opcional), 019, 020, 021.
+
+## 16. Perfil: mapa de estados reseñados e iconos (actualizado 2026-10-07)
+
+- **Tarjeta "ESTADOS RESEÑADOS"** bajo la cabecera de cada perfil (`components/StatesMapCard.tsx`): mapa del mundo en negro con los estados/provincias donde la persona publicó al menos una reseña con ubicación, pintados de lima, y el número. Mide "reseñó", no "estuvo" (se puede reseñar un lugar desde casa). Reseñas anteriores sin ubicación y shorts no cuentan. Sin migración: usa `posts.lat` y `posts.lng`, ya públicos (`loadVisitedPoints` en `lib/posts.ts`).
+- **Mapa:** `assets/regions.json` (1.9 MB, 4,242 regiones de 241 países) sale de Natural Earth admin-1 a 10 m (dominio público, sin obligación de crédito, pero conviene mencionarlo en los créditos). Se simplificó con Douglas-Peucker (tolerancia 0.04°, 2 decimales, islas menores de 0.12° descartadas salvo la mayor de cada región); se perdieron 354 regiones diminutas (sobre todo municipios de países pequeños). Se regenera con `scripts/RegionsBuilder.cs` desde PowerShell 5.1: `Add-Type -Path scripts/RegionsBuilder.cs -ReferencedAssemblies System.Web.Extensions; [RegionsBuilder]::Build(entrada.geojson, salida.json, 0.04, 2, 0.12)`.
+- El dibujo y la asignación punto→estado ocurren dentro de un canvas (WebView/iframe, sin red) en `lib/regionsMapHtml.ts`. Si un punto queda fuera de todo contorno por la simplificación, se asigna el estado más cercano (máx. ~35 km). Sin probar en iPhone (peso/velocidad del WebView). El mapa es fijo, sin zoom ni toques.
+- **Pestañas del perfil** (fotos, videos, guardados): solo iconos. Siguen mezclando todo; falta decidir cómo se separan reseñas y shorts en el perfil.
+- **Notificaciones:** el panel va directo a la lista (sin título, contador, botón de recargar ni notas); "Marcar todas como leídas" solo aparece si hay sin leer.
