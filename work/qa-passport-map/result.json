@@ -1,0 +1,53 @@
+{
+  "type": "porahi-map-result",
+  "count": 5,
+  "total": 4239,
+  "countries": [
+    {
+      "a": "Mexico",
+      "v": 3,
+      "t": 32,
+      "names": [
+        "Nuevo León",
+        "Distrito Federal",
+        "Jalisco"
+      ]
+    },
+    {
+      "a": "United States of America",
+      "v": 2,
+      "t": 51,
+      "names": [
+        "California",
+        "New York"
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "MEX-2714",
+      "name": "Nuevo León",
+      "country": "Mexico"
+    },
+    {
+      "id": "MEX-2727",
+      "name": "Distrito Federal",
+      "country": "Mexico"
+    },
+    {
+      "id": "MEX-2719",
+      "name": "Jalisco",
+      "country": "Mexico"
+    },
+    {
+      "id": "USA-3521",
+      "name": "California",
+      "country": "United States of America"
+    },
+    {
+      "id": "USA-3559",
+      "name": "New York",
+      "country": "United States of America"
+    }
+  ]
+}
