@@ -2,7 +2,7 @@ import React from 'react';
 import {View,Text,StyleSheet} from 'react-native';
 import {palette as p} from '../lib/theme';
 
-export type IconName='photos'|'video'|'message'|'search'|'profile'|'plus'|'bell'|'bookmark'|'arrow'|'heart'|'refresh'|'settings';
+export type IconName='photos'|'video'|'message'|'search'|'profile'|'plus'|'bell'|'bookmark'|'arrow'|'heart'|'refresh'|'settings'|'gallery';
 // Code-native geometry keeps the same icon weight on web/iOS without a font download.
 export default function Icon({name,size=24,color=p.ink,filled=false}:{name:IconName;size?:number;color?:string;filled?:boolean}){
  const border={borderColor:color};
@@ -19,6 +19,7 @@ export default function Icon({name,size=24,color=p.ink,filled=false}:{name:IconN
   case 'arrow':drawing=<><View style={[s.line,{left:3,top:11,width:19,backgroundColor:color,transform:[{rotate:'-45deg'}]}]}/><View style={{position:'absolute',left:10,top:4,width:10,height:10,borderTopWidth:2,borderRightWidth:2,borderColor:color}}/></>;break;
   case 'heart':drawing=<Text style={[s.glyph,{color,fontSize:29,lineHeight:29,top:-2}]}>{filled?'♥':'♡'}</Text>;break;
   case 'settings':drawing=<>{[5,11,17].map(top=><View key={top} style={[s.line,{left:3,top,width:18,backgroundColor:color}]}/>)}{[[6,3],[15,9],[9,15]].map(([left,top])=><View key={left} style={{position:'absolute',left,top,width:6,height:6,borderRadius:3,borderWidth:1.8,borderColor:color,backgroundColor:p.ink}}/>)}</>;break;
+  case 'gallery':drawing=<><View style={{position:'absolute',left:2,top:3,width:20,height:18,borderWidth:1.8,borderRadius:5,borderColor:color}}/><View style={{position:'absolute',left:14,top:7,width:4,height:4,borderRadius:2,backgroundColor:color}}/><View style={{position:'absolute',left:3.8,top:4.8,width:16.4,height:14.4,borderRadius:3,overflow:'hidden'}}><View style={{position:'absolute',left:0,top:8,width:9,height:9,borderTopWidth:1.8,borderLeftWidth:1.8,borderColor:color,transform:[{rotate:'45deg'}]}}/><View style={{position:'absolute',left:7,top:10,width:7,height:7,borderTopWidth:1.8,borderLeftWidth:1.8,borderColor:color,transform:[{rotate:'45deg'}]}}/></View></>;break;
   case 'refresh':drawing=<Text style={[s.glyph,{color,fontSize:28,lineHeight:28,top:-2}]}>↻</Text>;break;
  }
  return <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={{width:size,height:size}}><View style={[s.base,{transform:[{scale:size/24}],left:(size-24)/2,top:(size-24)/2}]}>{drawing}</View></View>;
