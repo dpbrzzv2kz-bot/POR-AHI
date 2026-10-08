@@ -2,7 +2,7 @@ export type ReactionMood='confetti'|'splash'|'none';
 export type OpinionSummary={likes:number;tomatoes:number;total:number;positiveRatio:number|null;mood:ReactionMood};
 
 // La calificacion del lugar la pone quien publica la resena (1 a 5), como estrellas con nombre propio.
-export const placeRatings=[{value:5,label:'Imperdible'},{value:4,label:'Volvería'},{value:3,label:'Pasa'},{value:2,label:'Mejor nada'},{value:1,label:'Tomatazo'}] as const;
+export const placeRatings=[{value:5,label:'Imperdible'},{value:4,label:'Volvería'},{value:3,label:'Pasa'},{value:2,label:'Tomatazo'},{value:1,label:'Mejor nada'}] as const;
 export function ratingLabel(value?:number|null):string|null{return placeRatings.find(item=>item.value===value)?.label??null;}
 export const MIN_ATMOSPHERE_VOTES=8;
 

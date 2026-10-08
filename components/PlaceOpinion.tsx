@@ -21,7 +21,7 @@ export default function PlaceOpinion({review,counts}:{review:Review;counts?:Post
  },[address,reactionsKey,attempt]);
  if(!address)return <OpinionMeter likes={counts?.likes} tomatoes={counts?.tomatoes}/>;
  return <View style={s.box}>
-  {result?<><OpinionMeter likes={result.likes} tomatoes={result.tomatoes} scope="place"/><Text style={s.note}>{result.reviewCount} {result.reviewCount===1?'reseña':'reseñas'} de esta dirección · reacciones de la comunidad</Text></>:error?<><Text accessibilityRole="alert" style={s.error}>{error}</Text><Pressable accessibilityRole="button" onPress={()=>setAttempt(n=>n+1)} style={s.retry}><Text style={s.retryText}>Reintentar</Text></Pressable></>:<Text style={s.note}>Cargando la opinión del lugar…</Text>}
+  {result?<><OpinionMeter likes={result.likes} tomatoes={result.tomatoes} scope="place"/></>:error?<><Text accessibilityRole="alert" style={s.error}>{error}</Text><Pressable accessibilityRole="button" onPress={()=>setAttempt(n=>n+1)} style={s.retry}><Text style={s.retryText}>Reintentar</Text></Pressable></>:<Text style={s.note}>Cargando la opinión del lugar…</Text>}
  </View>;
 }
 const s=StyleSheet.create({box:{marginBottom:18},note:{fontSize:11,lineHeight:17,color:p.muted,marginTop:7},error:{fontSize:12,lineHeight:19,color:p.error},retry:{minHeight:44,justifyContent:'center'},retryText:{fontSize:12,fontWeight:'700',color:p.violet}});

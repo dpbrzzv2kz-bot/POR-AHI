@@ -6,9 +6,10 @@ test('an empty opinion has no ratio and no atmosphere',()=>{
  assert.deepEqual(summarizeOpinion(),{likes:0,tomatoes:0,total:0,positiveRatio:null,mood:'none'});
 });
 test('the five ratings go from 5 Imperdible to 1 Tomatazo and unknown values have no label',()=>{
- assert.deepEqual(placeRatings.map(item=>item.label),['Imperdible','Volvería','Pasa','Mejor nada','Tomatazo']);
+ assert.deepEqual(placeRatings.map(item=>item.label),['Imperdible','Volvería','Pasa','Tomatazo','Mejor nada']);
  assert.equal(ratingLabel(5),'Imperdible');
- assert.equal(ratingLabel(1),'Tomatazo');
+ assert.equal(ratingLabel(2),'Tomatazo');
+ assert.equal(ratingLabel(1),'Mejor nada');
  for(const value of [0,6,2.5,null,undefined])assert.equal(ratingLabel(value),null);
 });
 test('atmosphere requires participation and a clear majority, never a tie',()=>{
