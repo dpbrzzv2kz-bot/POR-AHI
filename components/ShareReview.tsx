@@ -5,18 +5,25 @@ import {palette as p} from '../lib/theme';
 import ui from '../lib/uiStyles';
 import ScreenHeader from './ScreenHeader';
 import Icon from './Icon';
+// Hoja nativa de compartir (WhatsApp, Instagram, mensajes…). En la web solo existe si el navegador la ofrece.
+export const canShareDirectly=()=>Platform.OS!=='web'||(typeof navigator!=='undefined'&&typeof navigator.share==='function');
+export const makeTransport=():SharingTransport=>Platform.OS==='web'?{
+ share:typeof navigator!=='undefined'&&typeof navigator.share==='function'?data=>navigator.share(data):undefined,
+ copy:typeof navigator!=='undefined'&&navigator.clipboard?url=>navigator.clipboard.writeText(url):undefined,
+}:{share:async data=>{const result=await Share.share(Platform.OS==='ios'?{message:data.text,url:data.url}:{title:data.title,message:data.text+'\n'+data.url});if(result.action===Share.dismissedAction)return 'dismissed';}};
+// Abre la hoja de compartir directo. Devuelve false si hay que mostrar la pantalla de respaldo (enlace para copiar).
+export async function shareDirectly(review:ShareableReview):Promise<boolean>{
+ if(!canShareDirectly())return false;
+ try{const result=await deliverReviewLink(review,'share',makeTransport());return result==='shared'||result==='cancelled';}catch{return false;}
+}
 export default function ShareReview({review,close}:{review:ShareableReview;close:()=>void}){
  const [busy,setBusy]=React.useState(false),[notice,setNotice]=React.useState('');
  const lock=React.useRef(false),alive=React.useRef(true);
  React.useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
  const send=async(action:'share'|'copy')=>{
   if(lock.current)return;lock.current=true;setBusy(true);setNotice('');
-  const transport:SharingTransport=Platform.OS==='web'?{
-   share:typeof navigator!=='undefined'&&typeof navigator.share==='function'?data=>navigator.share(data):undefined,
-   copy:typeof navigator!=='undefined'&&navigator.clipboard?url=>navigator.clipboard.writeText(url):undefined,
-  }:{share:async data=>{const result=await Share.share(Platform.OS==='ios'?{message:data.text,url:data.url}:{title:data.title,message:data.text+'\n'+data.url});if(result.action===Share.dismissedAction)return 'dismissed';}};
   try{
-   const result=await deliverReviewLink(review,action,transport);
+   const result=await deliverReviewLink(review,action,makeTransport());
    if(alive.current)setNotice(result==='copied'?'Enlace copiado. Pégalo donde quieras.':result==='manual'?'Selecciona el enlace de abajo y cópialo.':result==='cancelled'?'Compartir cancelado.':'Puedes volver a la reseña.');
   }catch(e){if(alive.current)setNotice(e instanceof Error?e.message:'No se pudo preparar el enlace.');}
   finally{lock.current=false;if(alive.current)setBusy(false);}

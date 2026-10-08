@@ -13,7 +13,7 @@ export async function searchReviews(client:SupabaseClient,filters:DiscoveryFilte
  if([...query].length>80||/[\u0000-\u001f\u007f*]/u.test(query))throw new Error('Escribe un nombre de lugar de hasta 80 caracteres, sin asteriscos.');
  if(!reviewCategories.includes(filters.category)||!reviewFormats.includes(filters.format)||!Number.isSafeInteger(offset)||offset<0)throw new Error('Revisa los filtros de búsqueda.');
  try{
-  let request=client.from('posts').select('id,user_id,author_name,category,place,description,kind,media_path,edit_version,is_short,address').eq('is_short',false).order('created_at',{ascending:false}).order('id',{ascending:false}).range(offset,offset+discoveryPageSize);
+  let request=client.from('posts').select('id,user_id,author_name,category,place,description,kind,media_path,edit_version,created_at,is_short,address,rating').eq('is_short',false).order('created_at',{ascending:false}).order('id',{ascending:false}).range(offset,offset+discoveryPageSize);
   // Literal substring search: the visitor cannot turn %, _ or \ into wildcards.
   if(query)request=request.ilike('place','%'+query.replace(/[\\%_]/g,'\\$&')+'%');
   if(filters.category!=='Todas')request=request.eq('category',filters.category);

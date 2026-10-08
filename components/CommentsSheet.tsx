@@ -4,6 +4,7 @@ import type {ReportTarget} from '../lib/safety';
 import type {Review} from '../lib/posts';
 import {loadComments,addComment,removeComment,commentId,loadCommentReactions,setCommentReaction,type Comment,type CommentReaction,type CommentStats} from '../lib/interactions';
 import {palette as p} from '../lib/theme';
+import {softReactionFeedback} from '../lib/reactionFeedback';
 import Icon from './Icon';
 
 const ago=(iso:string)=>{
@@ -65,7 +66,7 @@ function Sheet({review,userId,close,onChange,report}:{review:Review;userId:strin
   const after={hearts:before.hearts-(current==='heart'?1:0)+(next==='heart'?1:0),tomatoes:before.tomatoes-(current==='tomato'?1:0)+(next==='tomato'?1:0)};
   setStats(value=>({...value,[row.id]:after}));
   setMine(value=>{const copy={...value};if(next)copy[row.id]=next;else delete copy[row.id];return copy;});
-  try{await setCommentReaction(userId,row.id,next,current);}
+  try{await setCommentReaction(userId,row.id,next,current);if(next)void softReactionFeedback();}
   catch(e){
    if(!mounted.current)return;
    setStats(value=>({...value,[row.id]:before}));

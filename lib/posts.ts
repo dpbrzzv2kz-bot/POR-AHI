@@ -4,7 +4,7 @@ import {uploadInChunks, checkSignal, waitForOperation, type UploadProgress} from
 import {hydrateReviews} from './reviewMedia';
 
 export type Media={uri:string;type:'image'|'video';mimeType?:string;fileName?:string;file?:File;size?:number;duration?:number};
-export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number;items?:Media[];isShort?:boolean;address?:string};
+export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number;createdAt?:string;items?:Media[];isShort?:boolean;address?:string;rating?:number};
 export type Story={id:string;userId:string;name:string;expires:number;media?:Media;color:string};
 const bucket='review-media';
 type PublishOptions={signal?:AbortSignal;progress?:(value:UploadProgress)=>void};
@@ -12,7 +12,7 @@ export async function loadPosts(filter?:{userId?:string;userIds?:string[];postId
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  if(filter?.userIds&&!filter.userIds.length)return [];
  if(filter?.postIds&&!filter.postIds.length)return [];
- let request=supabase.from('posts').select('id,user_id,author_name,category,place,description,kind,media_path,edit_version,is_short,address').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(60);
+ let request=supabase.from('posts').select('id,user_id,author_name,category,place,description,kind,media_path,edit_version,created_at,is_short,address,rating').order('created_at',{ascending:false}).order('id',{ascending:false}).limit(60);
  if(filter?.shorts!==undefined)request=request.eq('is_short',filter.shorts);
  if(filter?.userId)request=request.eq('user_id',filter.userId);
  if(filter?.userIds)request=request.in('user_id',filter.userIds);
@@ -36,8 +36,8 @@ export async function loadStories():Promise<Story[]>{
  }));
  return result.flat();
 }
-export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={},location?:{lat:number;lng:number;address?:string}|null,extras:Media[]=[],isShort=false){
- const fields={category,place:place.trim(),description:text.trim(),...(location?{lat:location.lat,lng:location.lng,...(location.address?{address:location.address.slice(0,300)}:{})}:{}),...(isShort?{is_short:true}:{})};
+export async function publishPost(media:Media,place:string,category:string,text:string,pathToken:string,options:PublishOptions={},location?:{lat:number;lng:number;address?:string}|null,extras:Media[]=[],isShort=false,rating=0){
+ const fields={category,place:place.trim(),description:text.trim(),...(location?{lat:location.lat,lng:location.lng,...(location.address?{address:location.address.slice(0,300)}:{})}:{}),...(isShort?{is_short:true}:rating>=1&&rating<=5?{rating}:{})};
  if(extras.length>9)throw new Error('Una publicación puede tener hasta 10 fotos o videos.');
  if(extras.length&&!isShort)return publishPostMany([media,...extras],pathToken,fields,options);
  return publishVisual(media,pathToken,'posts',fields,options);
@@ -154,9 +154,25 @@ async function publishPostMany(items:Media[],pathToken:string,fields:Record<stri
 // Ubicaciones de las reseñas de una persona (lat/lng ya son públicas con cada reseña). Alimentan el mapa de estados del perfil.
 export async function loadVisitedPoints(userId:string,signal?:AbortSignal):Promise<{lat:number;lng:number}[]>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
- let request=supabase.from('posts').select('lat,lng').eq('user_id',userId).eq('is_short',false).not('lat','is',null).not('lng','is',null).limit(500);
- if(signal)request=request.abortSignal(signal);
- const {data,error}=await request;
- if(error)throw new Error('No se pudo cargar el mapa de estados.');
- return (data||[]).map(row=>({lat:Number(row.lat),lng:Number(row.lng)})).filter(point=>Number.isFinite(point.lat)&&Number.isFinite(point.lng)&&Math.abs(point.lat)<=90&&Math.abs(point.lng)<=180);
+ const controller=new AbortController(),abort=()=>controller.abort();
+ if(signal?.aborted)controller.abort();else signal?.addEventListener('abort',abort,{once:true});
+ const timeout=setTimeout(abort,15000),snapshot=new Date().toISOString();
+ const points:{lat:number;lng:number}[]=[];
+ let after:string|undefined;
+ try{
+  for(;;){
+   if(controller.signal.aborted)throw new Error('No se pudo cargar el mapa de estados.');
+   let request=supabase.from('posts').select('id,lat,lng').eq('user_id',userId).eq('is_short',false).not('lat','is',null).not('lng','is',null).lte('created_at',snapshot).order('id',{ascending:true}).limit(250).abortSignal(controller.signal);
+   if(after)request=request.gt('id',after);
+   const {data,error}=await request;
+   if(error||controller.signal.aborted)throw new Error('No se pudo cargar el mapa de estados.');
+   const rows=data||[];
+   for(const row of rows){const lat=Number(row.lat),lng=Number(row.lng);if(Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180)points.push({lat,lng});}
+   if(rows.length<250)break;
+   const last=rows[rows.length-1].id;
+   if(!last||last===after)throw new Error('No se pudo cargar el mapa de estados.');
+   after=last;
+  }
+  return points;
+ }finally{clearTimeout(timeout);signal?.removeEventListener('abort',abort);}
 }

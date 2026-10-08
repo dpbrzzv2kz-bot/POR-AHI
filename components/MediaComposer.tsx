@@ -9,12 +9,12 @@ import {StatusBar} from 'expo-status-bar';
 import ReviewFlow from './ReviewFlow';
 import type {PickedPlace} from '../lib/mapHtml';
 
-type Props={storyMode:boolean;media:Media|null;busy:boolean;place:string;category:string;text:string;error:string;retry:boolean;progress:UploadProgress|null;preview:React.ReactNode;close:()=>void;pick:()=>void;capture?:()=>void;location?:PickedPlace|null;setLocation?:(value:PickedPlace|null)=>void;shortMode?:boolean;publish:(location?:PickedPlace)=>void;pause:()=>void;setPlace:(value:string)=>void;setCategory:(value:string)=>void;setText:(value:string)=>void};
-export default function MediaComposer({storyMode,media,busy,place,category,text,error,retry,progress,preview,close,pick,capture,location,setLocation,shortMode,publish,pause,setPlace,setCategory,setText}:Props){
+type Props={storyMode:boolean;media:Media|null;busy:boolean;place:string;category:string;text:string;error:string;retry:boolean;progress:UploadProgress|null;preview:React.ReactNode;close:()=>void;pick:()=>void;capture?:()=>void;location?:PickedPlace|null;setLocation?:(value:PickedPlace|null)=>void;shortMode?:boolean;publish:(location?:PickedPlace)=>void;pause:()=>void;setPlace:(value:string)=>void;setCategory:(value:string)=>void;setText:(value:string)=>void;rating:number;setRating:(value:number)=>void};
+export default function MediaComposer({storyMode,media,busy,place,category,text,error,retry,progress,preview,close,pick,capture,location,setLocation,shortMode,publish,pause,setPlace,setCategory,setText,rating,setRating}:Props){
  const publishLabel=busy?(progress?'Publicando…':'Preparando archivo…'):retry?'Reintentar publicación':storyMode?'Publicar story':'Publicar reseña';
  const pickLabel=busy?'Archivo en preparación o carga…':media?'Cambiar archivo':'Elegir foto o video';
  // Reseña con foto o video ya elegido: asistente por pasos sobre la foto (título, recomendación, mapa).
- if(!storyMode&&media)return <ReviewFlow busy={busy} place={place} category={category} text={text} error={error} retry={retry} progress={progress} preview={preview} close={close} publish={publish} pause={pause} setPlace={setPlace} setCategory={setCategory} setText={setText} location={location} setLocation={setLocation} short={shortMode}/>;
+ if(!storyMode&&media)return <ReviewFlow busy={busy} place={place} category={category} text={text} error={error} retry={retry} progress={progress} preview={preview} close={close} publish={publish} pause={pause} setPlace={setPlace} setCategory={setCategory} setText={setText} location={location} setLocation={setLocation} short={shortMode} rating={rating} setRating={setRating}/>;
  // Story con foto o video ya elegido: pantalla completa, solo cancelar y publicar.
  if(storyMode&&media)return <View style={{flex:1,backgroundColor:'#000'}}><StatusBar style="light"/>
   <View style={StyleSheet.absoluteFill}>{preview}</View>

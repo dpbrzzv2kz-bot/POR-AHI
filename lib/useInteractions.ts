@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {loadLibrary,loadStats,setInteraction,type PostStats} from './interactions';
 import {loadPosts,type Review} from './posts';
+import {softReactionFeedback} from './reactionFeedback';
 export default function useInteractions(userId:string|null,postIds:string[],refreshKey:Review[]){
  const [library,setLibrary]=useState<{owner:string|null;liked:string[];saved:string[];tomatoed:string[];ready:boolean}>({owner:null,liked:[],saved:[],tomatoed:[],ready:false});
  const [stats,setStats]=useState<Record<string,PostStats>>({}),[savedPosts,setSavedPosts]=useState<Review[]>([]),[savedBusy,setSavedBusy]=useState(false);
@@ -34,6 +35,7 @@ export default function useInteractions(userId:string|null,postIds:string[],refr
   const enabled=!(kind==='like'?owned.liked:kind==='tomato'?owned.tomatoed:owned.saved).includes(postId);
   try{await setInteraction(userId,postId,kind,enabled);
    if(version!==epoch.current)return;
+   if(enabled&&(kind==='like'||kind==='tomato'))void softReactionFeedback();
    setLibrary(p=>{if(p.owner!==userId)return p;const field=kind==='like'?'liked':kind==='tomato'?'tomatoed':'saved';const next={...p,[field]:enabled?[...new Set([...p[field],postId])]:p[field].filter(id=>id!==postId)};if(enabled&&kind==='like')next.tomatoed=next.tomatoed.filter(id=>id!==postId);if(enabled&&kind==='tomato')next.liked=next.liked.filter(id=>id!==postId);return next;});
    const statVersion=++statsEpoch.current;const rows=await loadStats(idsKey?idsKey.split(','):[postId]);if(version===epoch.current&&statVersion===statsEpoch.current)setStats(rows);
   }catch(e){if(version===epoch.current)setError(e instanceof Error?e.message:'No se pudo guardar.');}

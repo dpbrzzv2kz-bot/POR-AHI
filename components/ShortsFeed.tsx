@@ -5,6 +5,8 @@ import type {Review} from '../lib/posts';
 import type {PostStats} from '../lib/interactions';
 import {palette as p,categoryColor} from '../lib/theme';
 import Icon from './Icon';
+import OpinionMeter from './OpinionMeter';
+import ReactionAtmosphere from './ReactionAtmosphere';
 
 type Props={items:Review[];playing:boolean;liked:string[];tomatoed:string[];stats:Record<string,PostStats>;busy:boolean;refreshing:boolean;onRefresh:()=>void;onLike:(review:Review)=>void;onTomato:(review:Review)=>void;onComments:(review:Review)=>void;onMore:(review:Review)=>void;onShare:(review:Review)=>void;onCreate:()=>void};
 
@@ -17,11 +19,13 @@ function Short({review,height,playing,liked,tomato,counts,busy,onLike,onTomato,o
   <Pressable accessibilityRole="button" accessibilityLabel={paused?'Reproducir short':'Pausar short'} onPress={()=>setPaused(v=>!v)} style={StyleSheet.absoluteFill}>
    <VideoView player={player} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="cover"/>
   </Pressable>
+  <ReactionAtmosphere likes={counts?.likes} tomatoes={counts?.tomatoes} active={playing&&!paused}/>
   {paused&&<View pointerEvents="none" style={s.pauseMark}><Icon name="video" color="#FFFFFF" size={44}/></View>}
   <View pointerEvents="box-none" style={s.info}>
    <Text numberOfLines={1} style={s.author}>{review.author}</Text>
    <Text numberOfLines={2} style={s.title}>{review.place}</Text>
    <View style={[s.chip,{backgroundColor:categoryColor(review.category)}]}><Text style={s.chipText}>{review.category}</Text></View>
+   <OpinionMeter likes={counts?.likes} tomatoes={counts?.tomatoes} compact dark/>
   </View>
   <View style={s.actions}>
    <Pressable accessibilityRole="button" accessibilityLabel={liked?'Quitar me gusta':'Me gusta'} disabled={busy} onPress={onLike} style={s.action}><Icon name="heart" filled={liked} color={liked?p.lime:'#FFFFFF'} size={30}/><Text style={s.count}>{counts?.likes??'—'}</Text></Pressable>

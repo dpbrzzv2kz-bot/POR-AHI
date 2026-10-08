@@ -28,7 +28,7 @@ import MediaComposer from './components/MediaComposer';
 import StoryViewer from './components/StoryViewer';
 import ReviewDetails from './components/ReviewDetails';
 import {ContentEditor,PendingContent,type ContentAction} from './components/OwnContent';
-import ShareReview from './components/ShareReview';
+import ShareReview,{shareDirectly} from './components/ShareReview';
 import useSharedReview from './lib/useSharedReview';
 import {palette as p,categoryColor,categoryColors} from './lib/theme';
 import s from './lib/appStyles';
@@ -40,7 +40,11 @@ import MediaPager from './components/MediaPager';
 import ShortsFeed from './components/ShortsFeed';
 import StatesMapCard from './components/StatesMapCard';
 import CommentsSheet from './components/CommentsSheet';
+import OpinionMeter from './components/OpinionMeter';
+import ReactionAtmosphere from './components/ReactionAtmosphere';
+import PlaceOpinion from './components/PlaceOpinion';
 import {avatarUrl} from './lib/avatar';
+import {ratingLabel} from './lib/opinions';
 
 const seed:Review[] = [
  {id:'1',kind:'image',userId:'ana',near:true,category:'Comer',place:'Café del Patio',text:'Café tranquilo, luz de tarde y una mesa para conversar. Lo recomendaría para ir sin prisa con un amigo.',author:'Ana · Ficticia',color:'#b68158',symbol:'☕'},
@@ -66,12 +70,14 @@ function MediaCard({review,saved,toggle,open,share,height,liked,like,tomato,onTo
  const [ended,setEnded]=useState(false);
  const gesture=React.useMemo(()=>PanResponder.create({onMoveShouldSetPanResponder:(_,g)=>g.dy < -18 && Math.abs(g.dy)>Math.abs(g.dx)*1.5,onPanResponderRelease:(_,g)=>{if(g.dy < -45)open();}}),[open]);
  return <View style={s.mediaCard}>
-  <View style={s.cardHeading}><View style={[s.authorAvatar,{overflow:'hidden'}]}>{avatarUri?<Image accessibilityLabel={'Foto de '+review.author} source={{uri:avatarUri}} style={{width:'100%',height:'100%'}}/>:<Text style={s.authorInitial}>{review.author[0]?.toUpperCase()||'↗'}</Text>}</View><View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={s.cardAuthor}>{review.author}</Text><View style={{alignSelf:'flex-start',backgroundColor:categoryColor(review.category),borderRadius:99,paddingHorizontal:9,paddingVertical:2,marginTop:2}}><Text style={{color:p.ink,fontSize:11,fontWeight:'700'}}>{review.category}</Text></View></View><View style={{flexDirection:'row',alignItems:'center',gap:12}}><Text accessibilityLabel={(counts?.likes??0)+' corazones'} style={{fontSize:13,fontWeight:'800',color:liked?p.violet:p.ink}}>♥ {counts?.likes??'—'}</Text><Text accessibilityLabel={(counts?.tomatoes??0)+' tomates'} style={{fontSize:13,fontWeight:'800',color:tomato?'#D6402B':p.ink}}>🍅 {counts?.tomatoes??'—'}</Text></View></View>
+  <View style={s.cardHeading}><View style={[s.authorAvatar,{overflow:'hidden'}]}>{avatarUri?<Image accessibilityLabel={'Foto de '+review.author} source={{uri:avatarUri}} style={{width:'100%',height:'100%'}}/>:<Text style={s.authorInitial}>{review.author[0]?.toUpperCase()||'↗'}</Text>}</View><View style={{flex:1,minWidth:0}}><Text numberOfLines={1} style={s.cardAuthor}>{review.author}</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:2}}><View style={{backgroundColor:categoryColor(review.category),borderRadius:99,paddingHorizontal:9,paddingVertical:2}}><Text style={{color:p.ink,fontSize:11,fontWeight:'700'}}>{review.category}</Text></View></View></View>{!!ratingLabel(review.rating)&&<View accessibilityLabel={'Calificación: '+ratingLabel(review.rating)} style={{backgroundColor:p.ink,borderRadius:99,paddingHorizontal:11,paddingVertical:5}}><Text style={{color:p.lime,fontSize:12,fontWeight:'800'}}>{'★'.repeat(review.rating!)} {ratingLabel(review.rating)}</Text></View>}</View>
   <View style={[s.mediaArea,{height:Math.max(230,height-85),backgroundColor:review.color}]}>
   {review.items&&review.items.length>1?<MediaPager items={review.items} renderItem={item=>item.type==='video'?<Video uri={item.uri}/>:<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="cover"/>}/>:review.media?.type==='video'?<Video uri={review.media.uri} onEnd={()=>setEnded(true)}/>:review.media?<Image source={{uri:review.media.uri}} style={StyleSheet.absoluteFill} resizeMode="cover"/>:<View style={s.placeholder}><Text style={s.symbol}>{review.symbol}</Text><Text style={s.placeholderText}>ESPACIO PARA FOTO O VIDEO</Text><Text style={s.placeholderText}>MAQUETA · LUGAR FICTICIO</Text></View>}
+  <ReactionAtmosphere likes={counts?.likes} tomatoes={counts?.tomatoes}/>
   <View style={s.bottomOverlay} {...gesture.panHandlers}><Pressable accessibilityRole="button" accessibilityLabel={'Ver detalles de '+review.place} onPress={open} style={s.detailsButton}><View style={{flex:1,minWidth:0}}><Text numberOfLines={2} style={s.place}>{review.place}</Text><Text style={s.detailsText}>{ended?'¿Vamos? Ver detalles':'Ver detalles · desliza hacia arriba'}</Text></View><View style={s.detailArrow}><Icon name="arrow" size={21}/></View></Pressable></View>
   </View>
-  <View style={s.cardActions}><Pressable accessibilityRole="button" accessibilityLabel={liked?'Quitar me gusta':'Me gusta'} disabled={busy} onPress={like} style={s.actionControl}><Icon name="heart" filled={liked} color={liked?p.violet:p.ink}/></Pressable><Pressable accessibilityRole="button" accessibilityLabel={tomato?'Quitar tomate':'Dar tomate: no estoy de acuerdo'} disabled={busy} onPress={onTomato} style={s.actionControl}><Text style={{fontSize:23,opacity:tomato?1:.4}}>🍅</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={'Comentarios de '+review.place} onPress={onComments} style={s.actionControl}><Icon name="message" size={22}/><Text style={s.actionCount}>{counts?.comments??'—'}</Text></Pressable><View style={{flex:1}}/>{review.cloud&&<Pressable accessibilityRole="button" accessibilityLabel={'Compartir reseña de '+review.place} onPress={share} style={s.actionControl}><Icon name="arrow" size={23}/></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={saved?'Quitar de pendientes':'Guardar en pendientes'} disabled={busy} onPress={toggle} style={s.actionControl}><Icon name="bookmark" filled={saved} color={saved?p.violet:p.ink}/></Pressable></View>
+  <View style={s.cardActions}><Pressable accessibilityRole="button" accessibilityLabel={liked?'Quitar me gusta':'Me gusta'} disabled={busy} onPress={like} style={s.actionControl}><Icon name="heart" filled={liked} color={liked?p.violet:p.ink}/><Text style={s.actionCount}>{counts?.likes??'—'}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={tomato?'Quitar tomate':'Dar tomate: no estoy de acuerdo'} disabled={busy} onPress={onTomato} style={s.actionControl}><Text style={{fontSize:23,opacity:tomato?1:.4}}>🍅</Text><Text style={s.actionCount}>{counts?.tomatoes??'—'}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={'Comentarios de '+review.place} onPress={onComments} style={s.actionControl}><Icon name="message" size={22}/><Text style={s.actionCount}>{counts?.comments??'—'}</Text></Pressable><View style={{flex:1}}/>{review.cloud&&<Pressable accessibilityRole="button" accessibilityLabel={'Compartir reseña de '+review.place} onPress={share} style={s.actionControl}><Icon name="arrow" size={23}/></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel={saved?'Quitar de pendientes':'Guardar en pendientes'} disabled={busy} onPress={toggle} style={s.actionControl}><Icon name="bookmark" filled={saved} color={saved?p.violet:p.ink}/></Pressable></View>
+  {review.cloud&&<OpinionMeter likes={counts?.likes} tomatoes={counts?.tomatoes}/>}
  </View>;
 }
 
@@ -120,8 +126,8 @@ export default function App(){
  const [contentAction,setContentAction]=useState<ContentAction|null>(null),[contentVersion,setContentVersion]=useState(0),[contentBusy,setContentBusy]=useState(false);
  const [shareReview,setShareReview]=useState<Review|null>(null);
  React.useEffect(()=>{Promise.resolve().then(()=>setProfileStatus('loading'));},[userId]);
- React.useEffect(()=>{let active=true;Promise.resolve().then(()=>{if(active){setContentAction(null);setContentBusy(false);setDetail(null);setStory(null);setShareReview(null);}});return()=>{active=false;};},[userId]);
- const openShare=(review:Review)=>{setDetail(null);setShareReview(review);};
+ React.useEffect(()=>{let active=true;Promise.resolve().then(()=>{if(active){setContentAction(null);setContentBusy(false);setDetail(null);setStory(null);setShareReview(null);setCommentsPost(null);}});return()=>{active=false;};},[userId]);
+ const openShare=(review:Review)=>{setDetail(null);void shareDirectly(review).then(done=>{if(!done)setShareReview(review);});};
  const closeContent=()=>{setContentAction(null);setContentVersion(n=>n+1);};
  const openContent=(action:ContentAction)=>{setDetail(null);setStory(null);setContentBusy(false);setContentAction(action);};
  const contentChanged=(review:Review)=>{
@@ -130,7 +136,7 @@ export default function App(){
  };
  const [chat,setChat]=useState<{owner:string;conversation:Conversation}|null>(null);
  const startChat=async(peerId:string)=>{if(followBusy)return;if(!userId){setSocialError('Inicia sesión desde tu Perfil para enviar mensajes.');return;}const owner=userId,generation=socialGeneration.current;setFollowBusy(true);setSocialError('');try{const conversation=await openConversation(owner,peerId);if(generation===socialGeneration.current){setChat({owner,conversation});setTab('Mensajes');}}catch(e){if(generation===socialGeneration.current)setSocialError((e as Error).message);}finally{if(generation===socialGeneration.current)setFollowBusy(false);}};
- const [compose,setCompose]=useState(false),[storyMode,setStoryMode]=useState(false),[media,setMedia]=useState<Media|null>(null),[place,setPlace]=useState(''),[text,setText]=useState(''),[category,setCategory]=useState('Comer'),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const [compose,setCompose]=useState(false),[storyMode,setStoryMode]=useState(false),[media,setMedia]=useState<Media|null>(null),[place,setPlace]=useState(''),[text,setText]=useState(''),[category,setCategory]=useState('Comer'),[rating,setRating]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [uploadProgress,setUploadProgress]=useState<UploadProgress|null>(null),[retryPublication,setRetryPublication]=useState(false);
  const uploadController=React.useRef<AbortController|null>(null),publishLock=React.useRef(false),pickGeneration=React.useRef(0);
  React.useEffect(()=>{pickGeneration.current++;uploadController.current?.abort();uploadController.current=null;publishLock.current=false;setBusy(false);setCompose(false);setMedia(null);setUploadProgress(null);setRetryPublication(false);setError('');},[userId]);
@@ -210,7 +216,7 @@ export default function App(){
   if(busy||publishLock.current)return;
   if(reviewParam!==undefined)router.setParams({review:undefined});
   pickGeneration.current++;uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-  setStoryMode(isStory);setShortMode(false);setLocation(null);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);setExtras([]);
+  setStoryMode(isStory);setShortMode(false);setLocation(null);setCategory('Comer');setRating(0);setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);setExtras([]);
   const outcome=await choose('library',!isStory);
   if(outcome!=='cancel')setCompose(true);
  };
@@ -219,7 +225,7 @@ export default function App(){
   if(busy||publishLock.current)return;
   if(reviewParam!==undefined)router.setParams({review:undefined});
   pickGeneration.current++;uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-  setStoryMode(false);setShortMode(true);setLocation(null);setCategory('Comer');setMedia(null);setExtras([]);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
+  setStoryMode(false);setShortMode(true);setLocation(null);setCategory('Comer');setRating(0);setMedia(null);setExtras([]);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
   const outcome=await choose('library',false,true);
   if(outcome!=='cancel')setCompose(true);
  };
@@ -229,7 +235,7 @@ export default function App(){
   if(Platform.OS==='web'){void pickFirst(true);return;}
   if(reviewParam!==undefined)router.setParams({review:undefined});
   pickGeneration.current++;uploadToken.current=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
-  setStoryMode(true);setShortMode(false);setCategory('Comer');setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
+  setStoryMode(true);setShortMode(false);setCategory('Comer');setRating(0);setMedia(null);setPlace('');setText('');setError('');setUploadProgress(null);setRetryPublication(false);
   setCameraOpen(true);
  };
  const closeCamera=()=>{setCameraOpen(false);if(media)setTimeout(()=>setCompose(true),450);};
@@ -257,11 +263,12 @@ export default function App(){
   if(busy||publishLock.current)return;
   if(!media){setError('Selecciona una foto o video.');return;}
   if(!storyMode&&place.trim().length<2){setError('Escribe un título.');return;}
+  if(!storyMode&&!shortMode&&!rating){setError('Elige cómo calificas el lugar.');return;}
   if(!storyMode&&!shortMode&&!where){setError('Elige la ubicación en el mapa.');return;}
   publishLock.current=true;pickGeneration.current++;const controller=new AbortController();uploadController.current=controller;
   setBusy(true);setError('');setRetryPublication(false);
   const options={signal:controller.signal,progress:(value:UploadProgress)=>{if(uploadController.current===controller&&!controller.signal.aborted)setUploadProgress(value);}};
-  try{if(storyMode)await publishStory(media,uploadToken.current,options);else await publishPost(media,place,category,text,uploadToken.current,options,where,extras,shortMode);
+  try{if(storyMode)await publishStory(media,uploadToken.current,options);else await publishPost(media,place,category,text,uploadToken.current,options,where,extras,shortMode,rating);
    if(uploadController.current!==controller)return;
    setCompose(false);setMedia(null);setExtras([]);setUploadProgress(null);setTab(shortMode?'Videos':'Fotos');setAudience('Para ti');await refresh();
   }catch(e){if(uploadController.current===controller){setError(e instanceof UploadPaused?e.message:e instanceof Error?e.message:'No se pudo publicar. Intenta de nuevo.');setRetryPublication(true);setUploadProgress(value=>value?{...value,sent:value.accepted??value.sent,phase:'paused'}:null);}}
@@ -314,9 +321,9 @@ export default function App(){
   {!activePerson&&!showSaved&&!profileBusy&&!profileError&&!profileReviews.length&&<View style={s.profileEmpty}><Icon name="photos" size={28} color={p.violet}/><Text style={s.profileEmptyTitle}>Aquí van tus recomendaciones.</Text><Text style={s.body}>Pulsa ＋ para añadir tu primera foto o video. Stories y reseñas son formatos separados.</Text></View>}
  </>}
  </ScrollView>}<View style={s.nav}>{tabs.map(([t,icon])=><Pressable key={t} accessibilityRole="button" accessibilityLabel={'Ir a '+t} accessibilityState={{selected:tab===t}} onPress={()=>{if(reviewParam!==undefined)router.setParams({review:undefined});setTab(t);if(t==='Perfil'){setPerson(null);setActivePerson(null);setShowSaved(false);setCategory('Fotos');}}} style={s.navItem}><View style={[s.navIconBox,tab===t&&s.navIconActive,tab===t&&{backgroundColor:accent}]}><Icon name={icon} size={25} color={tab===t?p.ink:p.darkMuted}/></View></Pressable>)}</View>
- <Modal visible={!!detail} transparent animationType="slide" onRequestClose={()=>setDetail(null)}>{detail&&<ReviewDetails review={detail} close={()=>setDetail(null)} manage={detail.cloud&&userId&&detail.userId===userId?()=>openContent({kind:'post',id:detail.id,owner:userId,label:detail.place,review:detail}):undefined} report={detail.cloud&&detail.userId!==userId?()=>reportItem({kind:'post',id:detail.id,label:detail.place}):undefined} block={detail.cloud&&detail.userId!==userId&&detail.userId?()=>blockPerson(detail.userId!,detail.author):undefined}/>}</Modal>
+ <Modal visible={!!detail} transparent animationType="slide" onRequestClose={()=>setDetail(null)}>{detail&&<ReviewDetails key={detail.id} review={detail} opinion={<PlaceOpinion review={detail} counts={interactions.stats[detail.id]}/>} close={()=>setDetail(null)} manage={detail.cloud&&userId&&detail.userId===userId?()=>openContent({kind:'post',id:detail.id,owner:userId,label:detail.place,review:detail}):undefined} report={detail.cloud&&detail.userId!==userId?()=>reportItem({kind:'post',id:detail.id,label:detail.place}):undefined} block={detail.cloud&&detail.userId!==userId&&detail.userId?()=>blockPerson(detail.userId!,detail.author):undefined}/>}</Modal>
  <Modal visible={noticeOpen} animationType="slide" onRequestClose={()=>setNoticeOpen(false)}><NotificationsPanel userId={userId} rows={notices.rows} unread={notices.unread} loading={notices.loading} busy={notices.busy||noticeBusy} error={noticeError||notices.error} refresh={()=>{setNoticeError('');notices.refresh();}} mark={()=>notices.mark()} open={openNotice} close={()=>setNoticeOpen(false)} login={()=>{setNoticeOpen(false);setPerson(null);setActivePerson(null);setShowSaved(false);setTab('Perfil');}}/></Modal>
- <Modal visible={compose} animationType="slide" onRequestClose={()=>{if(!busy){pickGeneration.current++;setCompose(false);}}}><MediaComposer storyMode={storyMode} shortMode={shortMode} location={location} setLocation={setLocation} capture={storyMode&&Platform.OS!=='web'?reshoot:undefined} media={media} busy={busy} place={place} category={category} text={text} error={error} retry={retryPublication} progress={uploadProgress} close={()=>{pickGeneration.current++;setCompose(false);}} pick={pick} publish={publish} pause={()=>uploadController.current?.abort()} setPlace={setPlace} setCategory={setCategory} setText={setText} preview={media?(extras.length>0&&!storyMode?<MediaPager items={[media,...extras]} renderItem={item=>item.type==='image'?<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={item.uri} contentFit="contain"/>}/>:media.type==='image'?<Image source={{uri:media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={media.uri} contentFit="contain" autoPlay={storyMode||shortMode}/>):null}/></Modal>
+ <Modal visible={compose} animationType="slide" onRequestClose={()=>{if(!busy){pickGeneration.current++;setCompose(false);}}}><MediaComposer rating={rating} setRating={setRating} storyMode={storyMode} shortMode={shortMode} location={location} setLocation={setLocation} capture={storyMode&&Platform.OS!=='web'?reshoot:undefined} media={media} busy={busy} place={place} category={category} text={text} error={error} retry={retryPublication} progress={uploadProgress} close={()=>{pickGeneration.current++;setCompose(false);}} pick={pick} publish={publish} pause={()=>uploadController.current?.abort()} setPlace={setPlace} setCategory={setCategory} setText={setText} preview={media?(extras.length>0&&!storyMode?<MediaPager items={[media,...extras]} renderItem={item=>item.type==='image'?<Image source={{uri:item.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={item.uri} contentFit="contain"/>}/>:media.type==='image'?<Image source={{uri:media.uri}} style={StyleSheet.absoluteFill} resizeMode="contain"/>:<Video uri={media.uri} contentFit="contain" autoPlay={storyMode||shortMode}/>):null}/></Modal>
  <Modal visible={!!story} animationType="fade" onRequestClose={()=>setStory(null)}>{story&&<StoryViewer key={story.id} story={story} avatarUri={avatarUrl(storyAvatars[story.userId])} index={Math.max(0,storyQueue.filter(x=>x.userId===story.userId).findIndex(x=>x.id===story.id))} total={Math.max(1,storyQueue.filter(x=>x.userId===story.userId).length)} paused={storyHold} onHold={setStoryHold} onPrev={()=>goStory(-1)} onNext={()=>goStory(1)} autoAdvanceMs={story.media?.type==='image'?5000:undefined} own={!!userId&&story.userId===userId} close={()=>setStory(null)} remove={()=>{if(userId&&story.userId===userId)openContent({kind:'story',id:story.id,owner:userId,label:'Story de '+story.name});}} report={()=>reportItem({kind:'story',id:story.id,label:'Story de '+story.name})} media={story.media?(story.media.type==='image'?<Image source={{uri:story.media.uri}} style={StyleSheet.absoluteFill} resizeMode="cover"/>:(onProgress,paused)=><Video uri={story.media!.uri} contentFit="cover" autoPlay controls={false} paused={paused} onProgress={onProgress} onEnd={()=>goStory(1)}/>):null}/>}</Modal>
  <Modal visible={!!shareReview} animationType="slide" onRequestClose={()=>setShareReview(null)}>{shareReview&&<ShareReview key={shareReview.id+'-'+userId} review={shareReview} close={()=>setShareReview(null)}/>}</Modal>
  <Modal visible={!!contentAction&&contentAction.owner===userId} animationType="slide" onRequestClose={()=>{if(!contentBusy)closeContent();}}>{contentAction&&contentAction.owner===userId&&<ContentEditor key={contentAction.kind+contentAction.id+'-'+userId} action={contentAction} close={closeContent} changed={contentChanged} withdrawn={contentWithdrawn} done={()=>{interactions.retry();notices.refresh();refresh();}} busyChange={setContentBusy}/>}</Modal>
@@ -326,6 +333,6 @@ export default function App(){
  <Modal visible={focusOpen} transparent animationType="fade" onRequestClose={()=>setFocusOpen(false)}><Pressable accessibilityLabel="Cerrar filtro" onPress={()=>setFocusOpen(false)} style={{flex:1,backgroundColor:'rgba(23,23,28,.35)'}}><View style={{marginTop:Platform.OS==='ios'?100:64,marginHorizontal:18,alignSelf:'flex-start',minWidth:230,backgroundColor:p.surface,borderRadius:18,padding:8}}>{['Todo','Comer','Divertirse','Explorar'].map(o=>{const col=o==='Todo'?p.lime:categoryColors[o];return <Pressable key={o} accessibilityRole="button" accessibilityState={{selected:focus===o}} onPress={()=>{setFocus(o);setFocusOpen(false);}} style={{flexDirection:'row',alignItems:'center',gap:12,minHeight:48,paddingHorizontal:12,borderRadius:12,backgroundColor:focus===o?p.soft:'transparent'}}><View style={{width:16,height:16,borderRadius:8,backgroundColor:col,borderWidth:o==='Todo'?1:0,borderColor:p.ink}}/><Text style={{fontSize:15,fontWeight:focus===o?'800':'600',color:p.ink}}>{o}</Text></Pressable>;})}</View></Pressable></Modal>
  <Modal visible={settingsOpen} animationType="slide" onRequestClose={()=>setSettingsOpen(false)}><View style={{flex:1,backgroundColor:p.canvas}}><ScreenHeader close={()=>setSettingsOpen(false)} label="Cerrar configuración"/><ScrollView contentContainerStyle={{padding:20,paddingBottom:40,width:'100%',maxWidth:590,alignSelf:'center'}} keyboardShouldPersistTaps="handled"><Account settings onProfileChange={setOwnProfile} onProfileStatus={onProfileStatus}/></ScrollView></View></Modal>
  <Modal visible={cameraOpen} animationType="slide" onRequestClose={closeCamera}>{cameraOpen&&<StoryCamera onCapture={shot=>{void acceptShot(shot);}} onGallery={()=>{void shotFromGallery();}} onClose={closeCamera}/>}</Modal>
- <CommentsSheet review={commentsPost} userId={userId} close={()=>setCommentsPost(null)} onChange={interactions.refreshCounts} report={reportItem}/>
+ <CommentsSheet key={(commentsPost?.id||'closed')+'-'+userId} review={commentsPost} userId={userId} close={()=>setCommentsPost(null)} onChange={interactions.refreshCounts} report={reportItem}/>
  </View>;
 }
