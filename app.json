@@ -30,8 +30,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Por Ahí usa las fotos y videos que elijas para publicar tus reseñas y stories.",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "cameraPermission": "Por Ahí usa la cámara para que grabes tus stories y fotos.",
+          "microphonePermission": "Por Ahí usa el micrófono para grabar el sonido de tus videos."
         }
       ],
       "expo-web-browser"
