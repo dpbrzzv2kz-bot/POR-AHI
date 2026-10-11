@@ -56,7 +56,7 @@ function fixture(id='video-1',index=0){
  const viewerHost=new Hooks(),videoHost=new Hooks(),player=new Player();let progress:Function=()=>{},paused=false,tree:Element;let next=0;
  const animations:{value:Value;duration:number;callback?:Function;stopped:boolean}[]=[];
  const animated={Value,View:'Animated.View',timing:(value:Value,options:{duration:number})=>{const animation={value,duration:options.duration,callback:undefined as Function|undefined,stopped:false};animations.push(animation);return {start:(fn:Function)=>{animation.callback=fn;},stop:()=>{animation.stopped=true;animation.callback?.({finished:false});}};}};
- const Viewer=load(viewerSource,viewerHost,{'react-native':{...native,Animated:animated},'expo-status-bar':{StatusBar:'StatusBar'},'../lib/theme':{palette:{}},'./Icon':{default:'Icon'}}).default;
+ const Viewer=load(viewerSource,viewerHost,{'react-native':{...native,Animated:animated},'expo-status-bar':{StatusBar:'StatusBar'},'../lib/theme':{palette:{}},'./Icon':{default:'Icon'},'./StoryOverlayLayer':{default:'StoryOverlayLayer'}}).default;
  const Video=load(videoSource,videoHost,{'react-native':native,'expo-video':{VideoView:'VideoView',useVideoPlayer:(_uri:string,setup:Function)=>videoHost.useState(()=>{setup(player);return player;})[0]}}).Video;
  const props={story:{id,name:'Synthetic Person',expires:Date.now()+86400000},own:false,index,total:3,close:()=>{},remove:()=>{},report:()=>{},onNext:()=>{next++;},media:(fn:Function,isPaused:boolean)=>{progress=fn;paused=isPaused;return element('VideoView',{});}};
  const render=(changes:Record<string,any>={})=>{Object.assign(props,changes);tree=viewerHost.render(Viewer,props);videoHost.render(Video,{uri:id,autoPlay:true,controls:false,paused,onProgress:progress,onEnd:props.onNext});};

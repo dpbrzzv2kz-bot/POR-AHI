@@ -8,9 +8,11 @@ import UploadStatus from './UploadStatus';
 import {StatusBar} from 'expo-status-bar';
 import ReviewFlow from './ReviewFlow';
 import type {PickedPlace} from '../lib/mapHtml';
+import type {StoryOverlay} from '../lib/storyOverlays';
+import StoryOverlayEditor from './StoryOverlayEditor';
 
-type Props={storyMode:boolean;media:Media|null;busy:boolean;place:string;category:string;text:string;error:string;retry:boolean;progress:UploadProgress|null;preview:React.ReactNode;close:()=>void;pick:()=>void;capture?:()=>void;location?:PickedPlace|null;setLocation?:(value:PickedPlace|null)=>void;shortMode?:boolean;publish:(location?:PickedPlace)=>void;pause:()=>void;setPlace:(value:string)=>void;setCategory:(value:string)=>void;setText:(value:string)=>void;rating:number;setRating:(value:number)=>void};
-export default function MediaComposer({storyMode,media,busy,place,category,text,error,retry,progress,preview,close,pick,capture,location,setLocation,shortMode,publish,pause,setPlace,setCategory,setText,rating,setRating}:Props){
+type Props={storyMode:boolean;media:Media|null;busy:boolean;place:string;category:string;text:string;error:string;retry:boolean;progress:UploadProgress|null;preview:React.ReactNode;close:()=>void;pick:()=>void;capture?:()=>void;location?:PickedPlace|null;setLocation?:(value:PickedPlace|null)=>void;shortMode?:boolean;publish:(location?:PickedPlace)=>void;pause:()=>void;setPlace:(value:string)=>void;setCategory:(value:string)=>void;setText:(value:string)=>void;rating:number;setRating:(value:number)=>void;overlays?:StoryOverlay[];setOverlays?:(value:StoryOverlay[])=>void};
+export default function MediaComposer({storyMode,media,busy,place,category,text,error,retry,progress,preview,close,pick,capture,location,setLocation,shortMode,publish,pause,setPlace,setCategory,setText,rating,setRating,overlays,setOverlays}:Props){
  const publishLabel=busy?(progress?'Publicando…':'Preparando archivo…'):retry?'Reintentar publicación':storyMode?'Publicar story':'Publicar reseña';
  const pickLabel=busy?'Archivo en preparación o carga…':media?'Cambiar archivo':'Elegir foto o video';
  // Reseña con foto o video ya elegido: asistente por pasos sobre la foto (título, recomendación, mapa).
@@ -18,6 +20,7 @@ export default function MediaComposer({storyMode,media,busy,place,category,text,
  // Story con foto o video ya elegido: pantalla completa, solo cancelar y publicar.
  if(storyMode&&media)return <View style={{flex:1,backgroundColor:'#000'}}><StatusBar style="light"/>
   <View style={StyleSheet.absoluteFill}>{preview}</View>
+  {!!setOverlays&&<StoryOverlayEditor overlays={overlays||[]} setOverlays={setOverlays} disabled={busy}/>}
   <Pressable accessibilityRole="button" accessibilityLabel="Cancelar" disabled={busy} onPress={close} style={[s.fsClose,busy&&{opacity:.4}]}><View style={{transform:[{rotate:'45deg'}]}}><Icon name="plus" color="#FFFFFF" size={24}/></View></Pressable>
   <View style={s.fsBottom}>
    {!!error&&<Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[s.error,{marginTop:0,marginBottom:10}]}>{error}</Text>}

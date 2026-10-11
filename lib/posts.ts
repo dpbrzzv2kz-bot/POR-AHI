@@ -2,10 +2,11 @@ import {supabase} from './supabase';
 import {prepareMedia, mediaSource, mediaExtension} from './media';
 import {uploadInChunks, checkSignal, waitForOperation, type UploadProgress} from './resumable';
 import {hydrateReviews} from './reviewMedia';
+import {sanitizeOverlays,type StoryOverlay} from './storyOverlays';
 
 export type Media={uri:string;type:'image'|'video';mimeType?:string;fileName?:string;file?:File;size?:number;duration?:number};
 export type Review={id:string;category:string;place:string;text:string;author:string;color:string;symbol:string;media?:Media;kind?:'image'|'video';userId?:string;near?:boolean;cloud?:boolean;version?:number;createdAt?:string;items?:Media[];isShort?:boolean;address?:string;rating?:number};
-export type Story={id:string;userId:string;name:string;expires:number;media?:Media;color:string};
+export type Story={id:string;userId:string;name:string;expires:number;media?:Media;color:string;overlays?:StoryOverlay[]};
 const bucket='review-media';
 type PublishOptions={signal?:AbortSignal;progress?:(value:UploadProgress)=>void};
 export async function loadPosts(filter?:{userId?:string;userIds?:string[];postIds?:string[];shorts?:boolean},signal?:AbortSignal):Promise<Review[]>{
@@ -24,7 +25,7 @@ export async function loadPosts(filter?:{userId?:string;userIds?:string[];postId
 }
 export async function loadStories():Promise<Story[]>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
- const {data,error}=await supabase.from('stories').select('id,user_id,author_name,kind,media_path,expires_at').order('created_at',{ascending:false}).limit(60);
+ const {data,error}=await supabase.from('stories').select('id,user_id,author_name,kind,media_path,expires_at,overlays').order('created_at',{ascending:false}).limit(60);
  if(error)throw new Error('No se pudieron cargar las stories. Pulsa Actualizar publicaciones.');
  const groups=new Map<number,typeof data>();
  for(const row of data||[]){const remaining=Math.floor((Date.parse(row.expires_at)-Date.now())/1000);if(remaining<1)continue;const ttl=Math.min(3600,remaining);const rows=groups.get(ttl)||[];rows.push(row);groups.set(ttl,rows);}
@@ -32,7 +33,7 @@ export async function loadStories():Promise<Story[]>{
   const signed=await supabase!.storage.from(bucket).createSignedUrls(rows!.map(r=>r.media_path),ttl);
   if(signed.error)throw new Error('No se pudieron cargar los archivos de las stories. Pulsa Actualizar publicaciones.');
   const urls=new Map(signed.data?.map(r=>[r.path,r.signedUrl]));
-  return rows!.flatMap(row=>{const uri=urls.get(row.media_path);if(!uri)return [];return [{id:row.id,userId:row.user_id,name:row.author_name,expires:Date.parse(row.expires_at),media:{uri,type:row.kind} as Media,color:'#596e59'}];});
+  return rows!.flatMap(row=>{const uri=urls.get(row.media_path);if(!uri)return [];return [{id:row.id,userId:row.user_id,name:row.author_name,expires:Date.parse(row.expires_at),media:{uri,type:row.kind} as Media,color:'#596e59',overlays:sanitizeOverlays(row.overlays)}];});
  }));
  return result.flat();
 }
@@ -42,10 +43,11 @@ export async function publishPost(media:Media,place:string,category:string,text:
  if(extras.length&&!isShort)return publishPostMany([media,...extras],pathToken,fields,options);
  return publishVisual(media,pathToken,'posts',fields,options);
 }
-export async function publishStory(media:Media,pathToken:string,options:PublishOptions={}){
- return publishVisual(media,pathToken,'stories',{},options);
+export async function publishStory(media:Media,pathToken:string,options:PublishOptions={},overlays:StoryOverlay[]=[]){
+ const clean=sanitizeOverlays(overlays);
+ return publishVisual(media,pathToken,'stories',clean.length?{overlays:clean}:{},options);
 }
-async function publishVisual(media:Media,pathToken:string,table:'posts'|'stories',fields:Record<string,string|number|boolean>,options:PublishOptions){
+async function publishVisual(media:Media,pathToken:string,table:'posts'|'stories',fields:Record<string,string|number|boolean|object>,options:PublishOptions){
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
  checkSignal(options.signal);
  options.progress?.({phase:'preparing',sent:0,total:media.size||0});

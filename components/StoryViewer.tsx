@@ -14,7 +14,7 @@ const ago=(since:number)=>{
 
 // Visor de stories como en Instagram: pantalla completa, barritas de progreso arriba (una por story), toque a la derecha para
 // la siguiente y a la izquierda para la anterior. Las fotos duran autoAdvanceMs; los videos avisan al terminar (onEnd en App).
-export default function StoryViewer({story,own,media,close,remove,report,index=0,total=1,onPrev,onNext,autoAdvanceMs,avatarUri,paused=false,onHold}:{story:Story;own:boolean;media:React.ReactNode|((onProgress:(currentTime:number,duration:number)=>void,paused:boolean)=>React.ReactNode);close:()=>void;remove:()=>void;report:()=>void;index?:number;total?:number;onPrev?:()=>void;onNext?:()=>void;autoAdvanceMs?:number;avatarUri?:string|null;paused?:boolean;onHold?:(holding:boolean)=>void}){
+export default function StoryViewer({story,own,media,close,remove,report,index=0,total=1,onPrev,onNext,autoAdvanceMs,avatarUri,paused=false,onHold,underlay,overlayLayer}:{story:Story;own:boolean;media:React.ReactNode|((onProgress:(currentTime:number,duration:number)=>void,paused:boolean)=>React.ReactNode);close:()=>void;remove:()=>void;report:()=>void;index?:number;total?:number;onPrev?:()=>void;onNext?:()=>void;autoAdvanceMs?:number;avatarUri?:string|null;paused?:boolean;onHold?:(holding:boolean)=>void;underlay?:React.ReactNode;overlayLayer?:React.ReactNode}){
  const next=useRef(onNext);
  useEffect(()=>{next.current=onNext;},[onNext]);
  const [progress]=useState(()=>new Animated.Value(0)),current=useRef(0);
@@ -43,7 +43,8 @@ export default function StoryViewer({story,own,media,close,remove,report,index=0
  return <View style={s.screen}><StatusBar style="light"/>
   <View style={s.stage} onLayout={event=>{stageWidth.current=event.nativeEvent.layout.width;}}>
    <View style={StyleSheet.absoluteFill}>{(typeof media==='function'?media(videoProgress,menu||paused):media)||<View style={s.placeholder}><Icon name="photos" color={p.darkMuted} size={42}/><Text style={s.note}>STORY DE EJEMPLO · SIN ARCHIVO</Text></View>}</View>
-   <Pressable accessibilityRole="button" accessibilityLabel="Toca a la derecha para la siguiente story y a la izquierda para la anterior. Mantén presionado para pausar." onPressIn={pressIn} onPressOut={event=>pressOut(event.nativeEvent.locationX)} style={StyleSheet.absoluteFill}/>
+   {underlay}<Pressable accessibilityRole="button" accessibilityLabel="Toca a la derecha para la siguiente story y a la izquierda para la anterior. Mantén presionado para pausar." onPressIn={pressIn} onPressOut={event=>pressOut(event.nativeEvent.locationX)} style={StyleSheet.absoluteFill}/>
+   {overlayLayer}
    <View pointerEvents="box-none" style={s.top}>
     <View style={s.bars}>{Array.from({length:total}).map((_,i)=><View key={i} style={s.segment}>{i<index?<View style={[s.fill,{width:'100%'}]}/>:i===index?<Animated.View style={[s.fill,{width}]}/>:null}</View>)}</View>
     <View style={s.header}>
