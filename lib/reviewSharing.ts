@@ -1,4 +1,5 @@
-const publicOrigin='https://incredible-crumble-34cbca.netlify.app';
+import {APP_ORIGIN} from './appOrigin.ts';
+const publicOrigin=APP_ORIGIN;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function sharedReviewId(value:unknown):string|null{
  return typeof value==='string'&&uuid.test(value)?value.toLowerCase():null;

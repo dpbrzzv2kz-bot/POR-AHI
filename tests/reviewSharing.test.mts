@@ -4,7 +4,7 @@ import {deliverReviewLink,reviewLink,sharedReviewId} from '../lib/reviewSharing.
 const id='10000000-0000-4000-8000-000000000001';
 const review={id,cloud:true,place:'Café de prueba',author:'Beta Ana',media:{uri:'https://storage.invalid/file?token=private'}};
 test('links contain only a canonical published review ID; duplicates and demo IDs are rejected',()=>{
- assert.equal(reviewLink({...review,id:id.toUpperCase()}),`https://incredible-crumble-34cbca.netlify.app/?review=${id}`);
+ assert.equal(reviewLink({...review,id:id.toUpperCase()}),`https://por-ahi-ap.pages.dev/?review=${id}`);
  for(const value of ['',undefined,[id,id],{toString:()=>id},id+'#access_token=secret'])assert.equal(sharedReviewId(value),null);
  assert.throws(()=>reviewLink({...review,cloud:false}));assert.throws(()=>reviewLink({...review,id:'1'}));
 });

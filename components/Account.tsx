@@ -1,3 +1,4 @@
+import {APP_ORIGIN} from '../lib/appOrigin';
 import React,{useEffect,useRef,useState} from 'react';
 import {View,Text,TextInput,Image,Pressable,StyleSheet,Platform} from 'react-native';
 import type {Session} from '@supabase/supabase-js';
@@ -64,7 +65,7 @@ export default function Account({onProfileChange,onProfileStatus,onboarding=fals
   if(!email.trim().includes('@')||password.length<8){setNotice('Escribe tu correo y una contraseña de al menos 8 caracteres.');return;}
   setBusy(true);
   try{
-   const result=signup?await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:'https://incredible-crumble-34cbca.netlify.app/'}}):await supabase.auth.signInWithPassword({email:email.trim(),password});
+   const result=signup?await supabase.auth.signUp({email:email.trim(),password,options:{emailRedirectTo:APP_ORIGIN+'/'}}):await supabase.auth.signInWithPassword({email:email.trim(),password});
    if(result.error){setNotice(result.error.code==='email_not_confirmed'?'Confirma tu correo antes de entrar.':'No se pudo completar. Revisa los datos; si has intentado varias veces, espera antes de volver a intentar.');}
    else if(signup&&!result.data.session){setNotice('Revisa tu correo para confirmar la cuenta. Después vuelve aquí e inicia sesión.');setPassword('');}
   }catch{setNotice('No hay conexión. Intenta de nuevo.');}finally{setBusy(false);}

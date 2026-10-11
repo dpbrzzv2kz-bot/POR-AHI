@@ -1,6 +1,7 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
 
-export const GOOGLE_REDIRECT='https://incredible-crumble-34cbca.netlify.app/auth/google';
+import {APP_ORIGIN} from './appOrigin.ts';
+export const GOOGLE_REDIRECT=APP_ORIGIN+'/auth/google';
 export const GOOGLE_SCOPES='openid email profile';
 type Auth=SupabaseClient['auth'];
 export type GoogleCallback='session'|'error'|'none';

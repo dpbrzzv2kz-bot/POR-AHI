@@ -1,6 +1,7 @@
 import type {SupabaseClient} from '@supabase/supabase-js';
 
-export const RECOVERY_REDIRECT='https://incredible-crumble-34cbca.netlify.app/reset-password';
+import {APP_ORIGIN} from './appOrigin.ts';
+export const RECOVERY_REDIRECT=APP_ORIGIN+'/reset-password';
 export const RECOVERY_SENT='Si hay una cuenta con ese correo, recibirás un enlace para elegir una nueva contraseña. Revisa también spam y usa el enlace más reciente.';
 type Auth=SupabaseClient['auth'];
 type TabStorage=Pick<Storage,'getItem'|'setItem'|'removeItem'>;
