@@ -48,13 +48,21 @@ export async function removeComment(userId:string,id:string,restore=false){
 export function commentId(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.floor(Math.random()*16);return(c==='x'?r:(r&3)|8).toString(16);});}
 
 // Total de corazones y tomates que han recibido las publicaciones de una persona (suma los contadores públicos de cada una).
+const RECEIVED_PAGE=300,RECEIVED_PAGE_LIMIT=40;
 export async function loadReceivedReactions(userId:string,signal?:AbortSignal):Promise<{likes:number;tomatoes:number}>{
  if(!supabase)throw new Error('La conexión todavía no está configurada.');
- let request=supabase.from('posts').select('id').eq('user_id',userId).limit(300);
- if(signal)request=request.abortSignal(signal);
- const {data,error}=await request;
- if(error)throw new Error('No se pudieron cargar las reacciones.');
- const ids=(data||[]).map(row=>row.id as string);
+ // Todas las publicaciones de la persona, por páginas (antes solo contaba las primeras 300 y el nivel de crítico salía mal).
+ const ids:string[]=[];
+ for(let page=0;;page++){
+  if(page>=RECEIVED_PAGE_LIMIT)throw new Error('Hay demasiadas publicaciones para calcular las reacciones.');
+  let request=supabase.from('posts').select('id').eq('user_id',userId).order('id',{ascending:true}).range(page*RECEIVED_PAGE,page*RECEIVED_PAGE+RECEIVED_PAGE-1);
+  if(signal)request=request.abortSignal(signal);
+  const {data,error}=await request;
+  if(error)throw new Error('No se pudieron cargar las reacciones.');
+  const rows=(data||[]).map(row=>row.id as string);
+  ids.push(...rows);
+  if(rows.length<RECEIVED_PAGE)break;
+ }
  let likes=0,tomatoes=0;
  for(let start=0;start<ids.length;start+=50){
   const stats=await loadStats(ids.slice(start,start+50),signal);
